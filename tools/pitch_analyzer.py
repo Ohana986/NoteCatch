@@ -10,10 +10,10 @@
 """音高分析工具：逐帧追踪音高，输出 CSV + 可视化图。
 
 用法:
-    uv run pitch_analyzer.py <音频文件>              # 全频段 (C2~C7)
-    uv run pitch_analyzer.py --vocal <音频文件>      # 人声范围 (80~500 Hz)
-    uv run pitch_analyzer.py --range 80 800 <文件>   # 自定义范围 (Hz)
-    uv run pitch_analyzer.py --vocal --tol 0.5 <文件> # 调整音高合并精度(半音)
+    python pitch_analyzer.py <音频文件>              # 全频段 (C2~C7)
+    python pitch_analyzer.py --vocal <音频文件>      # 人声范围 (80~500 Hz)
+    python pitch_analyzer.py --range 80 800 <文件>   # 自定义范围 (Hz)
+    python pitch_analyzer.py --vocal --tol 0.5 <文件> # 调整音高合并精度(半音)
 
 输出:
     *_pitch.csv       — 逐帧音高详情

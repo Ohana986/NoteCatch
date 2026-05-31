@@ -8,9 +8,9 @@
 """根据音高分析结果合成音频并播放。
 
 用法:
-    uv run pitch_play.py <segments.csv>              # 读取音段CSV，合成WAV并播放
-    uv run pitch_play.py <segments.csv> --no-play    # 只合成不播放
-    uv run pitch_play.py <segments.csv> --tone sine  # 波形: sine | saw | square (默认 sine)
+    python pitch_play.py <segments.csv>              # 读取音段CSV，合成WAV并播放
+    python pitch_play.py <segments.csv> --no-play    # 只合成不播放
+    python pitch_play.py <segments.csv> --tone sine  # 波形: sine | saw | square (默认 sine)
 """
 
 import sys

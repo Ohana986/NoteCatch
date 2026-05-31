@@ -4,30 +4,57 @@
 
 ## 环境准备（首次使用）
 
+### 方式一：一键安装（推荐）
+
 ```bash
-# 1. 克隆仓库
+git clone https://github.com/Ohana986/audio-analyzer.git
+cd audio-analyzer
+bash setup.sh
+```
+
+`setup.sh` 自动创建 venv、安装 Python 依赖。你只需提前安装系统包：
+
+```bash
+# Fedora
+sudo dnf install python3-gobject gtk4 libadwaita \
+    gstreamer1-plugins-good gstreamer1-plugins-base \
+    pulseaudio-utils ffmpeg pipx
+# Debian/Ubuntu
+sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
+    pulseaudio-utils ffmpeg pipx
+
+# 然后用 pipx 安装 CLI 工具
+pipx install demucs
+pipx install basic-pitch
+```
+
+安装后使用：
+
+```bash
+source .venv/bin/activate
+cd tools
+python gui.py          # 启动 GUI
+python pipeline.py ../recordings/录音.wav   # 命令行管线
+```
+
+### 方式二：使用 uv（可选）
+
+```bash
 git clone https://github.com/Ohana986/audio-analyzer.git
 cd audio-analyzer
 
-# 2. 安装 uv（Python 包管理器）
+# 安装 uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 3. 安装系统依赖
-# Fedora:
-sudo dnf install python3-gobject gtk4 libadwaita \
-    gstreamer1-plugins-good gstreamer1-plugins-base \
-    pulseaudio-utils ffmpeg
-# Debian/Ubuntu:
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
-    gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
-    pulseaudio-utils ffmpeg
-
-# 4. 安装 CLI 工具（全局）
+# 安装 CLI 工具
 uv tool install demucs
 uv tool install --python 3.11 basic-pitch
-```
 
-各 Python 脚本通过 [PEP 723](https://peps.python.org/pep-0723/) 内联声明依赖，`uv run` 自动处理，无需手动 `pip install`。
+# 使用（uv 自动处理 PEP 723 依赖）
+cd tools
+uv run gui.py
+```
 
 ## 项目结构
 

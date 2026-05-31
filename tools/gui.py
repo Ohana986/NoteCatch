@@ -1059,7 +1059,7 @@ class RecorderApp(Adw.Application):
             # Step 1: Demucs
             GLib.idle_add(row.show_progress, "Demucs 人声分离...", 0.0)
             result = subprocess.run(
-                ["uv", "run", str(SCRIPT_DIR / "vocal_extract.py"), audio_path],
+                [sys.executable, str(SCRIPT_DIR / "vocal_extract.py"), audio_path],
                 capture_output=True, text=True, timeout=600,
                 cwd=str(self.output_dir),
             )
@@ -1077,7 +1077,7 @@ class RecorderApp(Adw.Application):
             # Step 2: Basic Pitch → MIDI
             GLib.idle_add(row.show_progress, "Basic Pitch 音高分析 → MIDI...", 0.45)
             result = subprocess.run(
-                ["uv", "run", str(SCRIPT_DIR / "pitch_basic.py"),
+                [sys.executable, str(SCRIPT_DIR / "pitch_basic.py"),
                  "--save-midi", "--vocal", vocals_path],
                 capture_output=True, text=True, timeout=600,
                 cwd=str(self.output_dir),

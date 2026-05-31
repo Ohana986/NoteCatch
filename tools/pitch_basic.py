@@ -9,11 +9,11 @@ Basic Pitch 原生 CSV 格式:
     pitch_midi: MIDI 音符号 (0-127), velocity: 音量 (0-127)
 
 用法:
-    uv run pitch_basic.py <音频文件>                    # 默认
-    uv run pitch_basic.py --vocal <音频文件>            # 人声模式（限频+弱音敏感）
-    uv run pitch_basic.py --vocal --sensitive <文件>    # 更敏感（检测弱音）
-    uv run pitch_basic.py --vocal --min-vel 30 <文件>   # 过滤低音量杂音
-    uv run pitch_basic.py --save-midi <文件>            # 同时输出 MIDI
+    python pitch_basic.py <音频文件>                    # 默认
+    python pitch_basic.py --vocal <音频文件>            # 人声模式（限频+弱音敏感）
+    python pitch_basic.py --vocal --sensitive <文件>    # 更敏感（检测弱音）
+    python pitch_basic.py --vocal --min-vel 30 <文件>   # 过滤低音量杂音
+    python pitch_basic.py --save-midi <文件>            # 同时输出 MIDI
 
 参数:
     --onset <f>         起音阈值，默认 0.5，越低越敏感

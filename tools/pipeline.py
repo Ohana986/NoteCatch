@@ -16,12 +16,12 @@
   --analyze           额外运行 pYIN 逐帧分析，输出 CSV + 可视化 PNG
 
 用法:
-    uv run pipeline.py <音频文件>                             # 完整流程
-    uv run pipeline.py <音频文件> --midi-only                  # 只到 MIDI
-    uv run pipeline.py <音频文件> --midi-only --preset 75      # 预设参数
-    uv run pipeline.py <音频文件> --analyze                    # 含 pYIN 分析
-    uv run pipeline.py <音频文件> --onset 0.2 --no-play        # 自定义
-    uv run pipeline.py                                         # 自动找最新录音
+    python pipeline.py <音频文件>                             # 完整流程
+    python pipeline.py <音频文件> --midi-only                  # 只到 MIDI
+    python pipeline.py <音频文件> --midi-only --preset 75      # 预设参数
+    python pipeline.py <音频文件> --analyze                    # 含 pYIN 分析
+    python pipeline.py <音频文件> --onset 0.2 --no-play        # 自定义
+    python pipeline.py                                         # 自动找最新录音
 
 依赖:
     uv tool install --python 3.11 basic-pitch
@@ -47,7 +47,7 @@ def build_bp_args(vocals_path: str, *,
                   min_vel: int = 0,
                   save_midi: bool = True) -> list[str]:
     """构造 Basic Pitch 子进程命令行参数。"""
-    cmd = ["uv", "run", str(SCRIPT_DIR / "pitch_basic.py")]
+    cmd = [sys.executable, str(SCRIPT_DIR / "pitch_basic.py")]
     if save_midi:
         cmd.append("--save-midi")
     if vocal:
@@ -164,7 +164,7 @@ def main():
         print(f"  已存在: {vocals_path}，跳过")
     else:
         run_cmd(
-            ["uv", "run", str(SCRIPT_DIR / "vocal_extract.py"), audio],
+            [sys.executable, str(SCRIPT_DIR / "vocal_extract.py"), audio],
             desc="Demucs 人声提取", timeout=600)
 
     if not os.path.isfile(vocals_path):
@@ -184,7 +184,7 @@ def main():
     if analyze:
         step("(附加)  pYIN 逐帧音高分析")
         run_cmd(
-            ["uv", "run", str(SCRIPT_DIR / "pitch_analyzer.py"),
+            [sys.executable, str(SCRIPT_DIR / "pitch_analyzer.py"),
              "--vocal", vocals_path],
             desc="pYIN 分析", timeout=300)
 
@@ -204,7 +204,7 @@ def main():
         print(f"  错误：segments CSV 未生成 {seg_csv}", file=sys.stderr)
         sys.exit(1)
     run_cmd(
-        ["uv", "run", str(SCRIPT_DIR / "pitch_play.py"), seg_csv, "--no-play"],
+        [sys.executable, str(SCRIPT_DIR / "pitch_play.py"), seg_csv, "--no-play"],
         desc="纯音合成", timeout=120)
 
     # 确认 play 文件路径（pitch_play.py 会自动替换 _segments 为 _play）

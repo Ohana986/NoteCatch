@@ -5,9 +5,9 @@
 """人声提取工具：使用 Demucs (Hybrid Transformer) 分离人声轨道。
 
 用法:
-    uv run vocal_extract.py <音频文件>                       # 提取人声，保存为 <原名>_vocals.wav
-    uv run vocal_extract.py <音频文件> --out 输出路径.wav    # 指定输出路径
-    uv run vocal_extract.py <音频文件> --mp3                  # 输出 MP3 格式
+    python vocal_extract.py <音频文件>                       # 提取人声，保存为 <原名>_vocals.wav
+    python vocal_extract.py <音频文件> --out 输出路径.wav    # 指定输出路径
+    python vocal_extract.py <音频文件> --mp3                  # 输出 MP3 格式
 
 依赖: 需要全局安装 demucs (uv tool install demucs)
 """

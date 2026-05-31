@@ -7,10 +7,10 @@
 """将 MIDI 文件转为五线谱 (MusicXML)。
 
 用法:
-    uv run midi_to_sheet.py <文件.mid>                    # 转 MusicXML
-    uv run midi_to_sheet.py <文件.mid> --png              # 尝试渲染 PNG
-    uv run midi_to_sheet.py <文件.mid> --key C            # 指定调号 (默认自动)
-    uv run midi_to_sheet.py <文件.mid> --time 4/4         # 指定拍号
+    python midi_to_sheet.py <文件.mid>                    # 转 MusicXML
+    python midi_to_sheet.py <文件.mid> --png              # 尝试渲染 PNG
+    python midi_to_sheet.py <文件.mid> --key C            # 指定调号 (默认自动)
+    python midi_to_sheet.py <文件.mid> --time 4/4         # 指定拍号
 """
 
 import sys
