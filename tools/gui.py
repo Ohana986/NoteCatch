@@ -515,7 +515,7 @@ class RecorderApp(Adw.Application):
 
         # ── CSS 样式 ──
         css_provider = Gtk.CssProvider()
-        css_provider.load_from_string(b"""
+        css_provider.load_from_string("""
             .success {
                 color: @success_color;
                 font-weight: bold;
