@@ -668,16 +668,25 @@ class RecorderApp(Adw.Application):
         self.file_list.set_selection_mode(Gtk.SelectionMode.NONE)
         main_box.append(self.file_list)
 
-        # ── 添加文件按钮 ──
-        add_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        # ── 添加文件 / 刷新按钮 ──
+        add_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         add_box.set_halign(Gtk.Align.CENTER)
         add_box.set_margin_top(8)
+
         add_btn = Gtk.Button()
         add_btn.set_icon_name("list-add-symbolic")
         add_btn.add_css_class("flat")
         add_btn.set_tooltip_text("导入音频文件")
         add_btn.connect("clicked", self.on_import)
         add_box.append(add_btn)
+
+        refresh_btn = Gtk.Button()
+        refresh_btn.set_icon_name("view-refresh-symbolic")
+        refresh_btn.add_css_class("flat")
+        refresh_btn.set_tooltip_text("重新扫描目录，恢复已隐藏条目")
+        refresh_btn.connect("clicked", self._on_refresh)
+        add_box.append(refresh_btn)
+
         main_box.append(add_box)
 
         # ── 状态栏 ──
@@ -1104,6 +1113,13 @@ class RecorderApp(Adw.Application):
     # ──────────────────────────────────────────
     # 隐藏 / 删除
     # ──────────────────────────────────────────
+    def _on_refresh(self, btn):
+        """重新扫描目录，清除隐藏记录，恢复所有条目。"""
+        self._hidden_set.clear()
+        self._save_hidden()
+        self._refresh_file_list()
+        self._toast("目录已刷新，隐藏条目已恢复")
+
     def _on_hide_row(self, row: RecordingRow):
         if row is self.active_row:
             self._toast("该文件正在处理中，无法移除")
