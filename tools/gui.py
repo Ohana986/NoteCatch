@@ -166,7 +166,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(name_label)
 
         # 播放按钮
-        self.play_btn = Gtk.Button(label=_("播放"))
+        self.play_btn = Gtk.Button()
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self.play_btn.add_css_class("flat")
         self.play_btn.add_css_class("compact")
@@ -175,7 +175,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.play_btn)
 
         # 开始处理
-        self.process_btn = Gtk.Button(label=_("处理"))
+        self.process_btn = Gtk.Button()
         self.process_btn.set_icon_name("emblem-system-symbolic")
         self.process_btn.add_css_class("flat")
         self.process_btn.add_css_class("compact")
@@ -184,7 +184,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.process_btn)
 
         # 隐藏
-        self.hide_btn = Gtk.Button(label=_("隐藏"))
+        self.hide_btn = Gtk.Button()
         self.hide_btn.set_icon_name("edit-clear-symbolic")
         self.hide_btn.add_css_class("flat")
         self.hide_btn.add_css_class("compact")
@@ -193,7 +193,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.hide_btn)
 
         # 删除
-        self.delete_btn = Gtk.Button(label=_("删除"))
+        self.delete_btn = Gtk.Button()
         self.delete_btn.set_icon_name("user-trash-symbolic")
         self.delete_btn.add_css_class("flat")
         self.delete_btn.add_css_class("compact")
@@ -336,7 +336,6 @@ class RecordingRow(Gtk.ListBoxRow):
         self._paused = False
         self._duration_ns = 0
         self._seeking = False
-        self.play_btn.set_label(_("暂停"))
         self.play_btn.set_icon_name("media-playback-pause-symbolic")
         self._play_revealer.set_reveal_child(True)
         self._play_scale.set_value(0.0)
@@ -417,7 +416,6 @@ class RecordingRow(Gtk.ListBoxRow):
             return
         self._player.set_state(Gst.State.PAUSED)
         self._paused = True
-        self.play_btn.set_label(_("继续"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_label.set_label(_("⏸ 已暂停"))
         if self._pos_update_id:
@@ -429,7 +427,6 @@ class RecordingRow(Gtk.ListBoxRow):
             return
         self._player.set_state(Gst.State.PLAYING)
         self._paused = False
-        self.play_btn.set_label(_("暂停"))
         self.play_btn.set_icon_name("media-playback-pause-symbolic")
         self._play_label.set_label(_("▶ 播放中..."))
         self._start_position_updates()
@@ -441,7 +438,6 @@ class RecordingRow(Gtk.ListBoxRow):
         self._cleanup_player()
         self._playing = False
         self._paused = False
-        self.play_btn.set_label(_("播放"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_label.set_label("")
         self._play_revealer.set_reveal_child(False)
@@ -451,7 +447,6 @@ class RecordingRow(Gtk.ListBoxRow):
         self._cleanup_player()
         self._playing = False
         self._paused = False
-        self.play_btn.set_label(_("播放"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_scale.set_sensitive(False)
         self._play_label.set_label(_("播放完毕"))
@@ -492,24 +487,25 @@ class RecordingRow(Gtk.ListBoxRow):
         """语言切换后刷新所有按钮文字。"""
         # 播放按钮：根据当前状态
         if self._playing and not self._paused:
-            self.play_btn.set_label(_("暂停"))
+            self.play_btn.set_icon_name("media-playback-pause-symbolic")
         elif self._playing and self._paused:
-            self.play_btn.set_label(_("继续"))
+            self.play_btn.set_icon_name("media-playback-start-symbolic")
         else:
-            self.play_btn.set_label(_("播放"))
+            self.play_btn.set_icon_name("media-playback-start-symbolic")
         self.play_btn.set_tooltip_text(_("播放 / 暂停"))
 
         # 处理按钮
         if self._processed:
+            self.process_btn.set_icon_name("checkbox-checked-symbolic")
             self.process_btn.set_tooltip_text(_("处理完成"))
         else:
-            self.process_btn.set_label(_("处理"))
+            self.process_btn.set_icon_name("emblem-system-symbolic")
             self.process_btn.set_tooltip_text(_("Demucs 人声分离 + Basic Pitch → MIDI"))
 
         # 隐藏 / 删除 / 打开
-        self.hide_btn.set_label(_("隐藏"))
+        self.hide_btn.set_icon_name("edit-clear-symbolic")
         self.hide_btn.set_tooltip_text(_("从列表隐藏（保留文件）"))
-        self.delete_btn.set_label(_("删除"))
+        self.delete_btn.set_icon_name("user-trash-symbolic")
         self.delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
         self.open_btn.set_tooltip_text(_("打开录音所在文件夹"))
 
@@ -641,21 +637,21 @@ class RecorderApp(Adw.Application):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_box.set_halign(Gtk.Align.CENTER)
 
-        self.record_btn = Gtk.Button(label=_("录音"))
+        self.record_btn = Gtk.Button()
         self.record_btn.add_css_class("suggested-action")
         self.record_btn.set_icon_name("media-record-symbolic")
         self.record_btn.set_tooltip_text(_("开始录制系统音频"))
         self.record_btn.connect("clicked", self.on_record)
         btn_box.append(self.record_btn)
 
-        self.pause_btn = Gtk.Button(label=_("暂停"))
+        self.pause_btn = Gtk.Button()
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.pause_btn.set_sensitive(False)
         self.pause_btn.set_tooltip_text(_("暂停 / 继续录制"))
         self.pause_btn.connect("clicked", self.on_pause)
         btn_box.append(self.pause_btn)
 
-        self.stop_btn = Gtk.Button(label=_("终止"))
+        self.stop_btn = Gtk.Button()
         self.stop_btn.add_css_class("destructive-action")
         self.stop_btn.set_icon_name("media-playback-stop-symbolic")
         self.stop_btn.set_sensitive(False)
@@ -663,7 +659,7 @@ class RecorderApp(Adw.Application):
         self.stop_btn.connect("clicked", self.on_stop)
         btn_box.append(self.stop_btn)
 
-        self.dir_btn = Gtk.Button(label=_("输出路径"))
+        self.dir_btn = Gtk.Button()
         self.dir_btn.set_icon_name("folder-open-symbolic")
         self.dir_btn.set_tooltip_text(_("选择录音文件的输出目录"))
         self.dir_btn.connect("clicked", self.on_select_output)
@@ -751,7 +747,6 @@ class RecorderApp(Adw.Application):
     def _set_idle_state(self):
         self.record_btn.set_sensitive(True)
         self.pause_btn.set_sensitive(False)
-        self.pause_btn.set_label(_("暂停"))
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.stop_btn.set_sensitive(False)
         self.recording_hint.set_visible(False)
@@ -759,14 +754,12 @@ class RecorderApp(Adw.Application):
     def _set_recording_state(self, filename):
         self.record_btn.set_sensitive(False)
         self.pause_btn.set_sensitive(True)
-        self.pause_btn.set_label(_("暂停"))
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.stop_btn.set_sensitive(True)
         self.recording_hint.set_label(_("● 录音中  {}").format(filename))
         self.recording_hint.set_visible(True)
 
     def _set_paused_state(self, filename):
-        self.pause_btn.set_label(_("继续"))
         self.pause_btn.set_icon_name("media-playback-start-symbolic")
         self.recording_hint.set_label(_("⏸ 已暂停  {}").format(filename))
 
@@ -1010,13 +1003,9 @@ class RecorderApp(Adw.Application):
         self._subtitle.set_label(_("录制系统音频 → 人声分离 → MIDI 五线谱"))
 
         # 录音控制按钮
-        self.record_btn.set_label(_("录音"))
         self.record_btn.set_tooltip_text(_("开始录制系统音频"))
-        self.pause_btn.set_label(_("暂停"))
         self.pause_btn.set_tooltip_text(_("暂停 / 继续录制"))
-        self.stop_btn.set_label(_("终止"))
         self.stop_btn.set_tooltip_text(_("终止当前录制"))
-        self.dir_btn.set_label(_("输出路径"))
         self.dir_btn.set_tooltip_text(_("选择录音文件的输出目录"))
 
         # 深色模式按钮
