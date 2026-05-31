@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# audio-analyzer 一键安装脚本
+# NoteCatch 一键安装脚本
 # 用法: bash setup.sh
 set -eu
 
@@ -12,7 +12,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  audio-analyzer 环境安装${NC}"
+echo -e "${CYAN}  NoteCatch 环境安装${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 

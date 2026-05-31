@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# audio-analyzer 卸载脚本
+# NoteCatch 卸载脚本
 # 用法: bash uninstall.sh
 set -eu
 
@@ -12,7 +12,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}  audio-analyzer 卸载${NC}"
+echo -e "${CYAN}  NoteCatch 卸载${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
