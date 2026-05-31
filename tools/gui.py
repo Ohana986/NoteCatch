@@ -31,6 +31,7 @@ Gst.init(None)
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR))
+from i18n import _
 from common import resolve_paths
 
 
@@ -118,7 +119,7 @@ def find_recording_sink():
                 continue
         return (sink_id, fmt, rate)
     except Exception as e:
-        print(f"查找音频设备失败: {e}", file=sys.stderr)
+        print(_("查找音频设备失败: {}").format(e), file=sys.stderr)
         return None
 
 
@@ -165,39 +166,39 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(name_label)
 
         # 播放按钮
-        self.play_btn = Gtk.Button(label="播放")
+        self.play_btn = Gtk.Button(label=_("播放"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self.play_btn.add_css_class("flat")
         self.play_btn.add_css_class("compact")
-        self.play_btn.set_tooltip_text("播放 / 暂停")
+        self.play_btn.set_tooltip_text(_("播放 / 暂停"))
         self.play_btn.connect("clicked", self._on_play_toggle)
         row.append(self.play_btn)
 
         # 开始处理
-        self.process_btn = Gtk.Button(label="处理")
+        self.process_btn = Gtk.Button(label=_("处理"))
         self.process_btn.set_icon_name("emblem-system-symbolic")
         self.process_btn.add_css_class("flat")
         self.process_btn.add_css_class("compact")
-        self.process_btn.set_tooltip_text("Demucs 人声分离 + Basic Pitch → MIDI")
+        self.process_btn.set_tooltip_text(_("Demucs 人声分离 + Basic Pitch → MIDI"))
         self.process_btn.connect("clicked", lambda b: on_process(self))
         row.append(self.process_btn)
 
         # 隐藏
-        hide_btn = Gtk.Button(label="隐藏")
+        hide_btn = Gtk.Button(label=_("隐藏"))
         hide_btn.set_icon_name("edit-clear-symbolic")
         hide_btn.add_css_class("flat")
         hide_btn.add_css_class("compact")
-        hide_btn.set_tooltip_text("从列表隐藏（保留文件）")
+        hide_btn.set_tooltip_text(_("从列表隐藏（保留文件）"))
         hide_btn.connect("clicked", lambda b: on_hide(self))
         row.append(hide_btn)
 
         # 删除
-        delete_btn = Gtk.Button(label="删除")
+        delete_btn = Gtk.Button(label=_("删除"))
         delete_btn.set_icon_name("user-trash-symbolic")
         delete_btn.add_css_class("flat")
         delete_btn.add_css_class("compact")
         delete_btn.add_css_class("destructive-action")
-        delete_btn.set_tooltip_text("删除录音及全部关联生成文件")
+        delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
         delete_btn.connect("clicked", lambda b: on_delete(self))
         row.append(delete_btn)
 
@@ -206,7 +207,7 @@ class RecordingRow(Gtk.ListBoxRow):
         open_btn.set_icon_name("document-open-symbolic")
         open_btn.add_css_class("flat")
         open_btn.add_css_class("compact")
-        open_btn.set_tooltip_text("打开录音所在文件夹")
+        open_btn.set_tooltip_text(_("打开录音所在文件夹"))
         open_btn.connect("clicked", self._on_open_row_folder)
         row.append(open_btn)
 
@@ -280,7 +281,7 @@ class RecordingRow(Gtk.ListBoxRow):
         self.process_btn.set_icon_name("checkbox-checked-symbolic")
         self.process_btn.add_css_class("success")
         self.process_btn.set_sensitive(False)
-        self.process_btn.set_tooltip_text("处理完成")
+        self.process_btn.set_tooltip_text(_("处理完成"))
 
     def _on_open_row_folder(self, btn):
         """打开本条目录下的文件夹。"""
@@ -315,7 +316,7 @@ class RecordingRow(Gtk.ListBoxRow):
         uri = Gst.filename_to_uri(self.filepath)
         self._player = Gst.ElementFactory.make("playbin", None)
         if self._player is None:
-            self._app._toast("无法创建 GStreamer 播放器")
+            self._app._toast(_("无法创建 GStreamer 播放器"))
             return
         self._player.set_property("uri", uri)
 
@@ -327,7 +328,7 @@ class RecordingRow(Gtk.ListBoxRow):
         # 开始播放
         ret = self._player.set_state(Gst.State.PLAYING)
         if ret == Gst.StateChangeReturn.FAILURE:
-            self._app._toast("播放失败")
+            self._app._toast(_("播放失败"))
             self._cleanup_player()
             return
 
@@ -335,12 +336,12 @@ class RecordingRow(Gtk.ListBoxRow):
         self._paused = False
         self._duration_ns = 0
         self._seeking = False
-        self.play_btn.set_label("暂停")
+        self.play_btn.set_label(_("暂停"))
         self.play_btn.set_icon_name("media-playback-pause-symbolic")
         self._play_revealer.set_reveal_child(True)
         self._play_scale.set_value(0.0)
         self._play_scale.set_sensitive(False)
-        self._play_label.set_label("▶ 播放中...")
+        self._play_label.set_label(_("▶ 播放中..."))
 
     def _on_gst_message(self, bus, msg):
         t = msg.type
@@ -349,7 +350,7 @@ class RecordingRow(Gtk.ListBoxRow):
             GLib.idle_add(self._on_playback_end)
         elif t == Gst.MessageType.ERROR:
             err, dbg = msg.parse_error()
-            print(f"GStreamer 错误: {err}", file=sys.stderr)
+            print(_("GStreamer 错误: {}").format(err), file=sys.stderr)
             GLib.idle_add(self._on_playback_end)
         elif t == Gst.MessageType.STATE_CHANGED:
             old, new, pending = msg.parse_state_changed()
@@ -416,9 +417,9 @@ class RecordingRow(Gtk.ListBoxRow):
             return
         self._player.set_state(Gst.State.PAUSED)
         self._paused = True
-        self.play_btn.set_label("继续")
+        self.play_btn.set_label(_("继续"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
-        self._play_label.set_label("⏸ 已暂停")
+        self._play_label.set_label(_("⏸ 已暂停"))
         if self._pos_update_id:
             GLib.source_remove(self._pos_update_id)
             self._pos_update_id = 0
@@ -428,9 +429,9 @@ class RecordingRow(Gtk.ListBoxRow):
             return
         self._player.set_state(Gst.State.PLAYING)
         self._paused = False
-        self.play_btn.set_label("暂停")
+        self.play_btn.set_label(_("暂停"))
         self.play_btn.set_icon_name("media-playback-pause-symbolic")
-        self._play_label.set_label("▶ 播放中...")
+        self._play_label.set_label(_("▶ 播放中..."))
         self._start_position_updates()
 
     def stop_playback(self):
@@ -440,7 +441,7 @@ class RecordingRow(Gtk.ListBoxRow):
         self._cleanup_player()
         self._playing = False
         self._paused = False
-        self.play_btn.set_label("播放")
+        self.play_btn.set_label(_("播放"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_label.set_label("")
         self._play_revealer.set_reveal_child(False)
@@ -450,10 +451,10 @@ class RecordingRow(Gtk.ListBoxRow):
         self._cleanup_player()
         self._playing = False
         self._paused = False
-        self.play_btn.set_label("播放")
+        self.play_btn.set_label(_("播放"))
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_scale.set_sensitive(False)
-        self._play_label.set_label("播放完毕")
+        self._play_label.set_label(_("播放完毕"))
         GLib.timeout_add_seconds(2, self._hide_play_progress)
         self._app._on_player_done(self)
 
@@ -523,7 +524,7 @@ class RecorderApp(Adw.Application):
     def do_activate(self):
         win = Adw.ApplicationWindow(application=self)
         win.set_default_size(580, 680)
-        win.set_title("录音分析工具")
+        win.set_title(_("录音分析工具"))
         win.set_resizable(True)
 
         # ── CSS 样式 ──
@@ -549,9 +550,9 @@ class RecorderApp(Adw.Application):
 
         # 深色模式切换按钮
         self._color_schemes = [
-            (Adw.ColorScheme.DEFAULT, "跟随系统", "computer-symbolic"),
-            (Adw.ColorScheme.FORCE_LIGHT, "浅色模式", "daytime-sunrise-symbolic"),
-            (Adw.ColorScheme.FORCE_DARK, "深色模式", "night-light-symbolic"),
+            (Adw.ColorScheme.DEFAULT, _("跟随系统"), "computer-symbolic"),
+            (Adw.ColorScheme.FORCE_LIGHT, _("浅色模式"), "daytime-sunrise-symbolic"),
+            (Adw.ColorScheme.FORCE_DARK, _("深色模式"), "night-light-symbolic"),
         ]
         self._color_idx = 0
         style_mgr = Adw.StyleManager.get_default()
@@ -579,12 +580,12 @@ class RecorderApp(Adw.Application):
         logo.set_margin_bottom(4)
         main_box.append(logo)
 
-        title_label = Gtk.Label(label="录音分析工具")
+        title_label = Gtk.Label(label=_("录音分析工具"))
         title_label.add_css_class("title-2")
         title_label.set_halign(Gtk.Align.CENTER)
         main_box.append(title_label)
 
-        subtitle = Gtk.Label(label="录制系统音频 → 人声分离 → MIDI 五线谱")
+        subtitle = Gtk.Label(label=_("录制系统音频 → 人声分离 → MIDI 五线谱"))
         subtitle.add_css_class("subtitle")
         subtitle.set_halign(Gtk.Align.CENTER)
         subtitle.set_margin_bottom(6)
@@ -599,31 +600,31 @@ class RecorderApp(Adw.Application):
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btn_box.set_halign(Gtk.Align.CENTER)
 
-        self.record_btn = Gtk.Button(label="录音")
+        self.record_btn = Gtk.Button(label=_("录音"))
         self.record_btn.add_css_class("suggested-action")
         self.record_btn.set_icon_name("media-record-symbolic")
-        self.record_btn.set_tooltip_text("开始录制系统音频")
+        self.record_btn.set_tooltip_text(_("开始录制系统音频"))
         self.record_btn.connect("clicked", self.on_record)
         btn_box.append(self.record_btn)
 
-        self.pause_btn = Gtk.Button(label="暂停")
+        self.pause_btn = Gtk.Button(label=_("暂停"))
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.pause_btn.set_sensitive(False)
-        self.pause_btn.set_tooltip_text("暂停 / 继续录制")
+        self.pause_btn.set_tooltip_text(_("暂停 / 继续录制"))
         self.pause_btn.connect("clicked", self.on_pause)
         btn_box.append(self.pause_btn)
 
-        self.stop_btn = Gtk.Button(label="终止")
+        self.stop_btn = Gtk.Button(label=_("终止"))
         self.stop_btn.add_css_class("destructive-action")
         self.stop_btn.set_icon_name("media-playback-stop-symbolic")
         self.stop_btn.set_sensitive(False)
-        self.stop_btn.set_tooltip_text("终止当前录制")
+        self.stop_btn.set_tooltip_text(_("终止当前录制"))
         self.stop_btn.connect("clicked", self.on_stop)
         btn_box.append(self.stop_btn)
 
-        self.dir_btn = Gtk.Button(label="输出路径")
+        self.dir_btn = Gtk.Button(label=_("输出路径"))
         self.dir_btn.set_icon_name("folder-open-symbolic")
-        self.dir_btn.set_tooltip_text("选择录音文件的输出目录")
+        self.dir_btn.set_tooltip_text(_("选择录音文件的输出目录"))
         self.dir_btn.connect("clicked", self.on_select_output)
         btn_box.append(self.dir_btn)
 
@@ -658,7 +659,7 @@ class RecorderApp(Adw.Application):
         main_box.append(sep2)
 
         # ── 文件列表 ──
-        list_header = Gtk.Label(label="录音文件", xalign=0)
+        list_header = Gtk.Label(label=_("录音文件"), xalign=0)
         list_header.add_css_class("heading")
         list_header.set_margin_bottom(8)
         main_box.append(list_header)
@@ -676,21 +677,21 @@ class RecorderApp(Adw.Application):
         add_btn = Gtk.Button()
         add_btn.set_icon_name("list-add-symbolic")
         add_btn.add_css_class("flat")
-        add_btn.set_tooltip_text("导入音频文件")
+        add_btn.set_tooltip_text(_("导入音频文件"))
         add_btn.connect("clicked", self.on_import)
         add_box.append(add_btn)
 
         refresh_btn = Gtk.Button()
         refresh_btn.set_icon_name("view-refresh-symbolic")
         refresh_btn.add_css_class("flat")
-        refresh_btn.set_tooltip_text("重新扫描目录，恢复已隐藏条目")
+        refresh_btn.set_tooltip_text(_("重新扫描目录，恢复已隐藏条目"))
         refresh_btn.connect("clicked", self._on_refresh)
         add_box.append(refresh_btn)
 
         main_box.append(add_box)
 
         # ── 状态栏 ──
-        self.statusbar = Gtk.Label(label="就绪", xalign=0)
+        self.statusbar = Gtk.Label(label=_("就绪"), xalign=0)
         self.statusbar.add_css_class("caption")
         self.statusbar.set_margin_top(10)
         self.statusbar.add_css_class("dim-label")
@@ -709,7 +710,7 @@ class RecorderApp(Adw.Application):
     def _set_idle_state(self):
         self.record_btn.set_sensitive(True)
         self.pause_btn.set_sensitive(False)
-        self.pause_btn.set_label("暂停")
+        self.pause_btn.set_label(_("暂停"))
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.stop_btn.set_sensitive(False)
         self.recording_hint.set_visible(False)
@@ -717,16 +718,16 @@ class RecorderApp(Adw.Application):
     def _set_recording_state(self, filename):
         self.record_btn.set_sensitive(False)
         self.pause_btn.set_sensitive(True)
-        self.pause_btn.set_label("暂停")
+        self.pause_btn.set_label(_("暂停"))
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.stop_btn.set_sensitive(True)
-        self.recording_hint.set_label(f"● 录音中  {filename}")
+        self.recording_hint.set_label(_("● 录音中  {}").format(filename))
         self.recording_hint.set_visible(True)
 
     def _set_paused_state(self, filename):
-        self.pause_btn.set_label("继续")
+        self.pause_btn.set_label(_("继续"))
         self.pause_btn.set_icon_name("media-playback-start-symbolic")
-        self.recording_hint.set_label(f"⏸ 已暂停  {filename}")
+        self.recording_hint.set_label(_("⏸ 已暂停  {}").format(filename))
 
     # ──────────────────────────────────────────
     # 录音
@@ -734,7 +735,7 @@ class RecorderApp(Adw.Application):
     def on_record(self, btn):
         sink_info = find_recording_sink()
         if sink_info is None:
-            self._toast("找不到音频输出设备")
+            self._toast(_("找不到音频输出设备"))
             return
 
         sink_id, fmt, rate = sink_info
@@ -761,17 +762,17 @@ class RecorderApp(Adw.Application):
                 stderr=subprocess.DEVNULL,
             )
         except FileNotFoundError:
-            self._toast("未找到 parecord，请安装 pulseaudio-utils")
+            self._toast(_("未找到 parecord，请安装 pulseaudio-utils"))
             return
         except Exception as e:
-            self._toast(f"启动录音失败: {e}")
+            self._toast(_("启动录音失败: {}").format(e))
             return
 
         self.recording_process = proc
         self.recording_path = out_path
         self.recording_paused = False
         self._set_recording_state(out_name)
-        self._toast("开始录音")
+        self._toast(_("开始录音"))
 
     # ──────────────────────────────────────────
     # 暂停 / 继续录音
@@ -786,12 +787,12 @@ class RecorderApp(Adw.Application):
             proc.send_signal(signal.SIGCONT)
             self.recording_paused = False
             self._set_recording_state(name)
-            self._toast("继续录制")
+            self._toast(_("继续录制"))
         else:
             proc.send_signal(signal.SIGSTOP)
             self.recording_paused = True
             self._set_paused_state(name)
-            self._toast("录制已暂停")
+            self._toast(_("录制已暂停"))
 
     # ──────────────────────────────────────────
     # 终止录音
@@ -816,11 +817,11 @@ class RecorderApp(Adw.Application):
 
         name = os.path.basename(self.recording_path) if self.recording_path else ""
         self._set_idle_state()
-        self.statusbar.set_label(f"已保存: {name}")
+        self.statusbar.set_label(_("已保存: {}").format(name))
         self.statusbar.add_css_class("dim-label")
         self.recording_path = None
         self._refresh_file_list()
-        self._toast("录音已保存")
+        self._toast(_("录音已保存"))
 
     # ──────────────────────────────────────────
     # 导入音频文件
@@ -828,12 +829,12 @@ class RecorderApp(Adw.Application):
     def on_import(self, btn):
         """打开文件选择器，导入音频文件到输出目录。"""
         dialog = Gtk.FileDialog()
-        dialog.set_title("导入音频文件")
+        dialog.set_title(_("导入音频文件"))
 
         # 设置过滤器
         filter_list = Gio.ListStore.new(Gtk.FileFilter)
         f = Gtk.FileFilter()
-        f.set_name("音频文件")
+        f.set_name(_("音频文件"))
         f.add_mime_type("audio/wav")
         f.add_mime_type("audio/mpeg")
         f.add_mime_type("audio/flac")
@@ -894,7 +895,7 @@ class RecorderApp(Adw.Application):
                     timeout=120,
                 )
                 if not os.path.isfile(dst):
-                    self._toast(f"转换失败: {name}")
+                    self._toast(_("转换失败: {}").format(name))
                     continue
 
             imported += 1
@@ -902,16 +903,16 @@ class RecorderApp(Adw.Application):
 
         if imported > 0:
             self._refresh_file_list()
-            self._toast(f"已导入 {imported} 个文件: {', '.join(imported_folders)}")
+            self._toast(_("已导入 {} 个文件: {}").format(imported, ", ".join(imported_folders)))
         else:
-            self._toast("没有成功导入任何文件")
+            self._toast(_("没有成功导入任何文件"))
 
     # ──────────────────────────────────────────
     # 选择输出路径
     # ──────────────────────────────────────────
     def on_select_output(self, btn):
         dialog = Gtk.FileDialog()
-        dialog.set_title("选择输出目录")
+        dialog.set_title(_("选择输出目录"))
         dialog.set_initial_folder(Gio.File.new_for_path(str(self.output_dir)))
         dialog.select_folder(
             parent=btn.get_root(),
@@ -1003,7 +1004,7 @@ class RecorderApp(Adw.Application):
         wavs = self._get_recording_wavs()
         if not wavs:
             empty_label = Gtk.Label(
-                label="暂无录音文件\n点击「录音」开始录制",
+                label=_("暂无录音文件\n点击「录音」开始录制"),
                 justify=Gtk.Justification.CENTER,
                 margin_top=24,
                 margin_bottom=24,
@@ -1028,18 +1029,18 @@ class RecorderApp(Adw.Application):
     # ──────────────────────────────────────────
     def _on_process_file(self, row: RecordingRow):
         if self.recording_process is not None:
-            self._toast("请先终止当前录音")
+            self._toast(_("请先终止当前录音"))
             return
         if self.active_row is not None:
-            self._toast("正在处理中，请等待完成")
+            self._toast(_("正在处理中，请等待完成"))
             return
         if row._processed:
-            self._toast("该条目已处理完成")
+            self._toast(_("该条目已处理完成"))
             return
 
         self.active_row = row
-        row.show_progress("准备中...", 0.0)
-        self.statusbar.set_label(f"后台处理: {row.basename}")
+        row.show_progress(_("准备中..."), 0.0)
+        self.statusbar.set_label(_("后台处理: {}").format(row.basename))
         self.statusbar.remove_css_class("dim-label")
 
         t = threading.Thread(
@@ -1057,7 +1058,7 @@ class RecorderApp(Adw.Application):
             midi_path = paths["midi"]
 
             # Step 1: Demucs
-            GLib.idle_add(row.show_progress, "Demucs 人声分离...", 0.0)
+            GLib.idle_add(row.show_progress, _("Demucs 人声分离..."), 0.0)
             result = subprocess.run(
                 [sys.executable, str(SCRIPT_DIR / "vocal_extract.py"), audio_path],
                 capture_output=True, text=True, timeout=600,
@@ -1065,17 +1066,17 @@ class RecorderApp(Adw.Application):
             )
             if result.returncode != 0:
                 err = (result.stderr or "")[:200]
-                GLib.idle_add(self._on_proc_done, row, f"Demucs 失败: {err}")
+                GLib.idle_add(self._on_proc_done, row, _("Demucs 失败: {}").format(err))
                 return
 
-            GLib.idle_add(row.show_progress, "Demucs 完成", 0.45)
+            GLib.idle_add(row.show_progress, _("Demucs 完成"), 0.45)
 
             if not os.path.isfile(vocals_path):
-                GLib.idle_add(self._on_proc_done, row, "错误: 人声文件未生成")
+                GLib.idle_add(self._on_proc_done, row, _("错误: 人声文件未生成"))
                 return
 
             # Step 2: Basic Pitch → MIDI
-            GLib.idle_add(row.show_progress, "Basic Pitch 音高分析 → MIDI...", 0.45)
+            GLib.idle_add(row.show_progress, _("Basic Pitch 音高分析 → MIDI..."), 0.45)
             result = subprocess.run(
                 [sys.executable, str(SCRIPT_DIR / "pitch_basic.py"),
                  "--save-midi", "--vocal", vocals_path],
@@ -1084,20 +1085,20 @@ class RecorderApp(Adw.Application):
             )
             if result.returncode != 0:
                 err = (result.stderr or "")[:200]
-                GLib.idle_add(self._on_proc_done, row, f"Basic Pitch 失败: {err}")
+                GLib.idle_add(self._on_proc_done, row, _("Basic Pitch 失败: {}").format(err))
                 return
 
             if os.path.isfile(midi_path):
-                msg = f"✅ {os.path.basename(midi_path)}"
+                msg = _("✅ {}").format(os.path.basename(midi_path))
             else:
-                msg = "✅ 处理完成"
+                msg = _("✅ 处理完成")
             GLib.idle_add(row.show_progress, msg, 1.0)
             GLib.idle_add(self._on_proc_done, row, msg)
 
         except subprocess.TimeoutExpired:
-            GLib.idle_add(self._on_proc_done, row, "处理超时 (600s)")
+            GLib.idle_add(self._on_proc_done, row, _("处理超时 (600s)"))
         except Exception as e:
-            GLib.idle_add(self._on_proc_done, row, f"处理出错: {e}")
+            GLib.idle_add(self._on_proc_done, row, _("处理出错: {}").format(e))
 
     def _on_proc_done(self, row: RecordingRow, msg):
         if msg.startswith("✅"):
@@ -1118,11 +1119,11 @@ class RecorderApp(Adw.Application):
         self._hidden_set.clear()
         self._save_hidden()
         self._refresh_file_list()
-        self._toast("目录已刷新，隐藏条目已恢复")
+        self._toast(_("目录已刷新，隐藏条目已恢复"))
 
     def _on_hide_row(self, row: RecordingRow):
         if row is self.active_row:
-            self._toast("该文件正在处理中，无法移除")
+            self._toast(_("该文件正在处理中，无法移除"))
             return
         # 停止播放（如果正在播）
         if self._playing_row is row:
@@ -1132,11 +1133,11 @@ class RecorderApp(Adw.Application):
         self._save_hidden()
         self.file_list.remove(row)
         self.rows.remove(row)
-        self._toast("已从列表移除")
+        self._toast(_("已从列表移除"))
 
     def _on_delete_row(self, row: RecordingRow):
         if row is self.active_row:
-            self._toast("该文件正在处理中，无法删除")
+            self._toast(_("该文件正在处理中，无法删除"))
             return
 
         # 停止播放（如果正在播）
@@ -1156,7 +1157,7 @@ class RecorderApp(Adw.Application):
         self.rows.remove(row)
         self._hidden_set.discard(row.basename)
         self._save_hidden()
-        self._toast(f"已删除 {deleted} 个文件")
+        self._toast(_("已删除 {} 个文件").format(deleted))
 
     # ──────────────────────────────────────────
     # Toast 通知
