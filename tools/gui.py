@@ -550,6 +550,22 @@ class RecorderApp(Adw.Application):
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         header.set_show_title(True)
+
+        # 深色模式切换按钮
+        self._color_schemes = [
+            (Adw.ColorScheme.DEFAULT, "跟随系统", "day-and-night-symbolic"),
+            (Adw.ColorScheme.FORCE_LIGHT, "浅色模式", "daytime-sunrise-symbolic"),
+            (Adw.ColorScheme.FORCE_DARK, "深色模式", "night-light-symbolic"),
+        ]
+        self._color_idx = 0
+        style_mgr = Adw.StyleManager.get_default()
+        self._dark_btn = Gtk.Button()
+        self._dark_btn.set_icon_name(self._color_schemes[0][2])
+        self._dark_btn.add_css_class("flat")
+        self._dark_btn.set_tooltip_text(self._color_schemes[0][1])
+        self._dark_btn.connect("clicked", self._on_toggle_color_scheme)
+        header.pack_end(self._dark_btn)
+
         toolbar_view.add_top_bar(header)
 
         scrolled = Gtk.ScrolledWindow(vexpand=True)
@@ -897,6 +913,20 @@ class RecorderApp(Adw.Application):
                 self._refresh_file_list()
         except GLib.GError:
             pass
+
+    def _on_open_folder(self, btn):
+        """在系统文件管理器中打开输出目录。"""
+        subprocess.Popen(["xdg-open", str(self.output_dir)],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+
+    def _on_toggle_color_scheme(self, btn):
+        """循环切换：跟随系统 → 浅色 → 深色。"""
+        self._color_idx = (self._color_idx + 1) % len(self._color_schemes)
+        scheme, label, icon = self._color_schemes[self._color_idx]
+        Adw.StyleManager.get_default().set_color_scheme(scheme)
+        self._dark_btn.set_icon_name(icon)
+        self._dark_btn.set_tooltip_text(label)
 
     # ──────────────────────────────────────────
     # 文件列表管理
