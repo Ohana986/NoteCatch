@@ -184,7 +184,7 @@ class RecordingRow(Gtk.ListBoxRow):
 
         # 隐藏
         hide_btn = Gtk.Button(label="隐藏")
-        hide_btn.set_icon_name("eye-not-looking-symbolic")
+        hide_btn.set_icon_name("edit-clear-symbolic")
         hide_btn.add_css_class("flat")
         hide_btn.add_css_class("compact")
         hide_btn.set_tooltip_text("从列表隐藏（保留文件）")
@@ -277,7 +277,7 @@ class RecordingRow(Gtk.ListBoxRow):
         """标记为已处理，按钮变为绿色对号图标。"""
         self._processed = True
         self.process_btn.set_label("")
-        self.process_btn.set_icon_name("emblem-ok-symbolic")
+        self.process_btn.set_icon_name("checkbox-checked-symbolic")
         self.process_btn.add_css_class("success")
         self.process_btn.set_sensitive(False)
         self.process_btn.set_tooltip_text("处理完成")
@@ -549,7 +549,7 @@ class RecorderApp(Adw.Application):
 
         # 深色模式切换按钮
         self._color_schemes = [
-            (Adw.ColorScheme.DEFAULT, "跟随系统", "day-and-night-symbolic"),
+            (Adw.ColorScheme.DEFAULT, "跟随系统", "computer-symbolic"),
             (Adw.ColorScheme.FORCE_LIGHT, "浅色模式", "daytime-sunrise-symbolic"),
             (Adw.ColorScheme.FORCE_DARK, "深色模式", "night-light-symbolic"),
         ]
