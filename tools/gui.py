@@ -1025,7 +1025,7 @@ class RecorderApp(Adw.Application):
             (Adw.ColorScheme.FORCE_LIGHT, _("浅色模式"), "daytime-sunrise-symbolic"),
             (Adw.ColorScheme.FORCE_DARK, _("深色模式"), "night-light-symbolic"),
         ]
-        _, label, icon = self._color_schemes[self._color_idx]
+        _scheme, label, icon = self._color_schemes[self._color_idx]
         self._dark_btn.set_tooltip_text(label)
 
         # 列表
