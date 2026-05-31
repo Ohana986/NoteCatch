@@ -12,22 +12,7 @@ cd audio-analyzer
 bash setup.sh
 ```
 
-`setup.sh` 自动创建 venv、安装 Python 依赖。你只需提前安装系统包：
-
-```bash
-# Fedora
-sudo dnf install python3-gobject gtk4 libadwaita \
-    gstreamer1-plugins-good gstreamer1-plugins-base \
-    pulseaudio-utils ffmpeg pipx
-# Debian/Ubuntu
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
-    gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
-    pulseaudio-utils ffmpeg pipx
-
-# 然后用 pipx 安装 CLI 工具
-pipx install demucs
-pipx install basic-pitch
-```
+`setup.sh` 会自动检测系统，列出四项操作：系统依赖 → Python 虚拟环境 → pip 依赖 → CLI 工具（demucs、basic-pitch）。确认后一键执行，无需手动操作。
 
 安装后使用：
 
