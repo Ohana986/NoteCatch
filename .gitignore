@@ -1,0 +1,11 @@
+# Python cache
+__pycache__/
+
+# Qwen Code internal
+.qwen/
+
+# Recordings data (可取消注释以纳入版本管理)
+recordings/
+
+# Hidden files
+.hidden_recordings
