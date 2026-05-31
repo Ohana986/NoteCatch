@@ -184,32 +184,32 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.process_btn)
 
         # 隐藏
-        hide_btn = Gtk.Button(label=_("隐藏"))
-        hide_btn.set_icon_name("edit-clear-symbolic")
-        hide_btn.add_css_class("flat")
-        hide_btn.add_css_class("compact")
-        hide_btn.set_tooltip_text(_("从列表隐藏（保留文件）"))
-        hide_btn.connect("clicked", lambda b: on_hide(self))
-        row.append(hide_btn)
+        self.hide_btn = Gtk.Button(label=_("隐藏"))
+        self.hide_btn.set_icon_name("edit-clear-symbolic")
+        self.hide_btn.add_css_class("flat")
+        self.hide_btn.add_css_class("compact")
+        self.hide_btn.set_tooltip_text(_("从列表隐藏（保留文件）"))
+        self.hide_btn.connect("clicked", lambda b: on_hide(self))
+        row.append(self.hide_btn)
 
         # 删除
-        delete_btn = Gtk.Button(label=_("删除"))
-        delete_btn.set_icon_name("user-trash-symbolic")
-        delete_btn.add_css_class("flat")
-        delete_btn.add_css_class("compact")
-        delete_btn.add_css_class("destructive-action")
-        delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
-        delete_btn.connect("clicked", lambda b: on_delete(self))
-        row.append(delete_btn)
+        self.delete_btn = Gtk.Button(label=_("删除"))
+        self.delete_btn.set_icon_name("user-trash-symbolic")
+        self.delete_btn.add_css_class("flat")
+        self.delete_btn.add_css_class("compact")
+        self.delete_btn.add_css_class("destructive-action")
+        self.delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
+        self.delete_btn.connect("clicked", lambda b: on_delete(self))
+        row.append(self.delete_btn)
 
         # 打开文件夹
-        open_btn = Gtk.Button()
-        open_btn.set_icon_name("document-open-symbolic")
-        open_btn.add_css_class("flat")
-        open_btn.add_css_class("compact")
-        open_btn.set_tooltip_text(_("打开录音所在文件夹"))
-        open_btn.connect("clicked", self._on_open_row_folder)
-        row.append(open_btn)
+        self.open_btn = Gtk.Button()
+        self.open_btn.set_icon_name("document-open-symbolic")
+        self.open_btn.add_css_class("flat")
+        self.open_btn.add_css_class("compact")
+        self.open_btn.set_tooltip_text(_("打开录音所在文件夹"))
+        self.open_btn.connect("clicked", self._on_open_row_folder)
+        row.append(self.open_btn)
 
         outer.append(row)
 
@@ -488,6 +488,40 @@ class RecordingRow(Gtk.ListBoxRow):
             self.process_btn.set_sensitive(True)
         self._proc_revealer.set_reveal_child(False)
 
+    def refresh_language(self):
+        """语言切换后刷新所有按钮文字。"""
+        # 播放按钮：根据当前状态
+        if self._playing and not self._paused:
+            self.play_btn.set_label(_("暂停"))
+        elif self._playing and self._paused:
+            self.play_btn.set_label(_("继续"))
+        else:
+            self.play_btn.set_label(_("播放"))
+        self.play_btn.set_tooltip_text(_("播放 / 暂停"))
+
+        # 处理按钮
+        if self._processed:
+            self.process_btn.set_tooltip_text(_("处理完成"))
+        else:
+            self.process_btn.set_label(_("处理"))
+            self.process_btn.set_tooltip_text(_("Demucs 人声分离 + Basic Pitch → MIDI"))
+
+        # 隐藏 / 删除 / 打开
+        self.hide_btn.set_label(_("隐藏"))
+        self.hide_btn.set_tooltip_text(_("从列表隐藏（保留文件）"))
+        self.delete_btn.set_label(_("删除"))
+        self.delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
+        self.open_btn.set_tooltip_text(_("打开录音所在文件夹"))
+
+        # 播放状态文字
+        if self._playing and not self._paused:
+            # 保留时间显示，由 _update_position 处理
+            pass
+        elif self._playing and self._paused:
+            self._play_label.set_label(_("⏸ 已暂停"))
+        elif not self._playing and self._play_label.get_label():
+            self._play_label.set_label(_("播放完毕"))
+
 
 # ──────────────────────────────────────────────
 # 主应用
@@ -522,10 +556,10 @@ class RecorderApp(Adw.Application):
             self._playing_row = None
 
     def do_activate(self):
-        win = Adw.ApplicationWindow(application=self)
-        win.set_default_size(580, 680)
-        win.set_title(_("录音分析工具"))
-        win.set_resizable(True)
+        self.win = Adw.ApplicationWindow(application=self)
+        self.win.set_default_size(580, 680)
+        self.win.set_title(_("录音分析工具"))
+        self.win.set_resizable(True)
 
         # ── CSS 样式 ──
         css_provider = Gtk.CssProvider()
@@ -561,6 +595,13 @@ class RecorderApp(Adw.Application):
         self._dark_btn.add_css_class("flat")
         self._dark_btn.set_tooltip_text(self._color_schemes[0][1])
         self._dark_btn.connect("clicked", self._on_toggle_color_scheme)
+
+        # 语言切换按钮（显示在深色按钮左边）
+        self._lang_btn = Gtk.Button()
+        self._lang_btn.add_css_class("flat")
+        self._lang_btn.connect("clicked", self._on_toggle_language)
+        self._update_lang_btn_label()
+        header.pack_end(self._lang_btn)
         header.pack_end(self._dark_btn)
 
         toolbar_view.add_top_bar(header)
@@ -580,16 +621,16 @@ class RecorderApp(Adw.Application):
         logo.set_margin_bottom(4)
         main_box.append(logo)
 
-        title_label = Gtk.Label(label=_("录音分析工具"))
-        title_label.add_css_class("title-2")
-        title_label.set_halign(Gtk.Align.CENTER)
-        main_box.append(title_label)
+        self._title_label = Gtk.Label(label=_("录音分析工具"))
+        self._title_label.add_css_class("title-2")
+        self._title_label.set_halign(Gtk.Align.CENTER)
+        main_box.append(self._title_label)
 
-        subtitle = Gtk.Label(label=_("录制系统音频 → 人声分离 → MIDI 五线谱"))
-        subtitle.add_css_class("subtitle")
-        subtitle.set_halign(Gtk.Align.CENTER)
-        subtitle.set_margin_bottom(6)
-        main_box.append(subtitle)
+        self._subtitle = Gtk.Label(label=_("录制系统音频 → 人声分离 → MIDI 五线谱"))
+        self._subtitle.add_css_class("subtitle")
+        self._subtitle.set_halign(Gtk.Align.CENTER)
+        self._subtitle.set_margin_bottom(6)
+        main_box.append(self._subtitle)
 
         sep1 = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         sep1.set_margin_top(8)
@@ -659,10 +700,10 @@ class RecorderApp(Adw.Application):
         main_box.append(sep2)
 
         # ── 文件列表 ──
-        list_header = Gtk.Label(label=_("录音文件"), xalign=0)
-        list_header.add_css_class("heading")
-        list_header.set_margin_bottom(8)
-        main_box.append(list_header)
+        self._list_header = Gtk.Label(label=_("录音文件"), xalign=0)
+        self._list_header.add_css_class("heading")
+        self._list_header.set_margin_bottom(8)
+        main_box.append(self._list_header)
 
         self.file_list = Gtk.ListBox()
         self.file_list.add_css_class("boxed-list")
@@ -674,19 +715,19 @@ class RecorderApp(Adw.Application):
         add_box.set_halign(Gtk.Align.CENTER)
         add_box.set_margin_top(8)
 
-        add_btn = Gtk.Button()
-        add_btn.set_icon_name("list-add-symbolic")
-        add_btn.add_css_class("flat")
-        add_btn.set_tooltip_text(_("导入音频文件"))
-        add_btn.connect("clicked", self.on_import)
-        add_box.append(add_btn)
+        self._add_btn = Gtk.Button()
+        self._add_btn.set_icon_name("list-add-symbolic")
+        self._add_btn.add_css_class("flat")
+        self._add_btn.set_tooltip_text(_("导入音频文件"))
+        self._add_btn.connect("clicked", self.on_import)
+        add_box.append(self._add_btn)
 
-        refresh_btn = Gtk.Button()
-        refresh_btn.set_icon_name("view-refresh-symbolic")
-        refresh_btn.add_css_class("flat")
-        refresh_btn.set_tooltip_text(_("重新扫描目录，恢复已隐藏条目"))
-        refresh_btn.connect("clicked", self._on_refresh)
-        add_box.append(refresh_btn)
+        self._refresh_btn = Gtk.Button()
+        self._refresh_btn.set_icon_name("view-refresh-symbolic")
+        self._refresh_btn.add_css_class("flat")
+        self._refresh_btn.set_tooltip_text(_("重新扫描目录，恢复已隐藏条目"))
+        self._refresh_btn.connect("clicked", self._on_refresh)
+        add_box.append(self._refresh_btn)
 
         main_box.append(add_box)
 
@@ -699,8 +740,8 @@ class RecorderApp(Adw.Application):
 
         scrolled.set_child(main_box)
         toolbar_view.set_content(scrolled)
-        win.set_content(toolbar_view)
-        win.present()
+        self.win.set_content(toolbar_view)
+        self.win.present()
 
         self._refresh_file_list()
 
@@ -944,6 +985,72 @@ class RecorderApp(Adw.Application):
         Adw.StyleManager.get_default().set_color_scheme(scheme)
         self._dark_btn.set_icon_name(icon)
         self._dark_btn.set_tooltip_text(label)
+
+    # ── 语言切换 ──
+    def _update_lang_btn_label(self):
+        """根据当前语言更新按钮文字。"""
+        from i18n import get_lang
+        self._lang_btn.set_label("EN" if get_lang() == "zh" else "CN")
+
+    def _on_toggle_language(self, btn):
+        """切换语言：zh ↔ en。"""
+        from i18n import set_lang, get_lang
+        new_lang = "en" if get_lang() == "zh" else "zh"
+        set_lang(new_lang)
+        self._update_lang_btn_label()
+        self._refresh_ui_language()
+
+    def _refresh_ui_language(self):
+        """语言切换后刷新所有 UI 文字。"""
+        # 窗口标题
+        self.win.set_title(_("录音分析工具"))
+
+        # 标题区
+        self._title_label.set_label(_("录音分析工具"))
+        self._subtitle.set_label(_("录制系统音频 → 人声分离 → MIDI 五线谱"))
+
+        # 录音控制按钮
+        self.record_btn.set_label(_("录音"))
+        self.record_btn.set_tooltip_text(_("开始录制系统音频"))
+        self.pause_btn.set_label(_("暂停"))
+        self.pause_btn.set_tooltip_text(_("暂停 / 继续录制"))
+        self.stop_btn.set_label(_("终止"))
+        self.stop_btn.set_tooltip_text(_("终止当前录制"))
+        self.dir_btn.set_label(_("输出路径"))
+        self.dir_btn.set_tooltip_text(_("选择录音文件的输出目录"))
+
+        # 深色模式按钮
+        self._color_schemes = [
+            (Adw.ColorScheme.DEFAULT, _("跟随系统"), "computer-symbolic"),
+            (Adw.ColorScheme.FORCE_LIGHT, _("浅色模式"), "daytime-sunrise-symbolic"),
+            (Adw.ColorScheme.FORCE_DARK, _("深色模式"), "night-light-symbolic"),
+        ]
+        _, label, icon = self._color_schemes[self._color_idx]
+        self._dark_btn.set_tooltip_text(label)
+
+        # 列表
+        self._list_header.set_label(_("录音文件"))
+        self._add_btn.set_tooltip_text(_("导入音频文件"))
+        self._refresh_btn.set_tooltip_text(_("重新扫描目录，恢复已隐藏条目"))
+        self.statusbar.set_label(_("就绪"))
+
+        # 录音行
+        for row in self.rows:
+            row.refresh_language()
+
+        # 空列表占位（如果显示中）
+        child = self.file_list.get_first_child()
+        if child and isinstance(child, Gtk.Label):
+            child.set_label(_("暂无录音文件\n点击「录音」开始录制"))
+
+        # 录制提示（如果显示中）
+        if self.recording_hint.get_visible():
+            if self.recording_paused:
+                name = os.path.basename(self.recording_path) if self.recording_path else ""
+                self.recording_hint.set_label(_("⏸ 已暂停  {}").format(name))
+            else:
+                name = os.path.basename(self.recording_path) if self.recording_path else ""
+                self.recording_hint.set_label(_("● 录音中  {}").format(name))
 
     # ──────────────────────────────────────────
     # 文件列表管理
