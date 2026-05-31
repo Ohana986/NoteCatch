@@ -174,6 +174,16 @@ class RecordingRow(Gtk.ListBoxRow):
         self.play_btn.connect("clicked", self._on_play_toggle)
         row.append(self.play_btn)
 
+        # 收起/展开进度条按钮
+        self._collapse_btn = Gtk.Button()
+        self._collapse_btn.set_icon_name("go-up-symbolic")
+        self._collapse_btn.add_css_class("flat")
+        self._collapse_btn.add_css_class("compact")
+        self._collapse_btn.set_tooltip_text(_("收起进度条"))
+        self._collapse_btn.set_visible(False)
+        self._collapse_btn.connect("clicked", self._on_collapse_toggle)
+        row.append(self._collapse_btn)
+
         # 开始处理
         self.process_btn = Gtk.Button()
         self.process_btn.set_icon_name("emblem-system-symbolic")
@@ -302,6 +312,17 @@ class RecordingRow(Gtk.ListBoxRow):
             # 开始播放
             self._start_playback()
 
+    def _on_collapse_toggle(self, btn):
+        """切换进度条的收起/展开状态。"""
+        if self._play_revealer.get_reveal_child():
+            self._play_revealer.set_reveal_child(False)
+            self._collapse_btn.set_icon_name("go-down-symbolic")
+            self._collapse_btn.set_tooltip_text(_("展开进度条"))
+        else:
+            self._play_revealer.set_reveal_child(True)
+            self._collapse_btn.set_icon_name("go-up-symbolic")
+            self._collapse_btn.set_tooltip_text(_("收起进度条"))
+
     def _start_playback(self):
         if not os.path.isfile(self.filepath):
             return
@@ -341,6 +362,9 @@ class RecordingRow(Gtk.ListBoxRow):
         self._play_scale.set_value(0.0)
         self._play_scale.set_sensitive(False)
         self._play_label.set_label(_("▶ 播放中..."))
+        self._collapse_btn.set_visible(True)
+        self._collapse_btn.set_icon_name("go-up-symbolic")
+        self._collapse_btn.set_tooltip_text(_("收起进度条"))
 
     def _on_gst_message(self, bus, msg):
         t = msg.type
@@ -441,6 +465,7 @@ class RecordingRow(Gtk.ListBoxRow):
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_label.set_label("")
         self._play_revealer.set_reveal_child(False)
+        self._collapse_btn.set_visible(False)
 
     def _on_playback_end(self):
         """播放自然结束。"""
@@ -450,6 +475,7 @@ class RecordingRow(Gtk.ListBoxRow):
         self.play_btn.set_icon_name("media-playback-start-symbolic")
         self._play_scale.set_sensitive(False)
         self._play_label.set_label(_("播放完毕"))
+        self._collapse_btn.set_visible(False)
         GLib.timeout_add_seconds(2, self._hide_play_progress)
         self._app._on_player_done(self)
 
@@ -508,6 +534,13 @@ class RecordingRow(Gtk.ListBoxRow):
         self.delete_btn.set_icon_name("user-trash-symbolic")
         self.delete_btn.set_tooltip_text(_("删除录音及全部关联生成文件"))
         self.open_btn.set_tooltip_text(_("打开录音所在文件夹"))
+
+        # 收起/展开按钮
+        if self._collapse_btn.get_visible():
+            if self._play_revealer.get_reveal_child():
+                self._collapse_btn.set_tooltip_text(_("收起进度条"))
+            else:
+                self._collapse_btn.set_tooltip_text(_("展开进度条"))
 
         # 播放状态文字
         if self._playing and not self._paused:
