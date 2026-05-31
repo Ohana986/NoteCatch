@@ -606,6 +606,11 @@ class RecorderApp(Adw.Application):
         self.stop_btn.connect("clicked", self.on_stop)
         btn_box.append(self.stop_btn)
 
+        self.import_btn = Gtk.Button(label="导入")
+        self.import_btn.set_icon_name("document-open-symbolic")
+        self.import_btn.connect("clicked", self.on_import)
+        btn_box.append(self.import_btn)
+
         self.dir_btn = Gtk.Button(label="输出路径")
         self.dir_btn.set_icon_name("folder-open-symbolic")
         self.dir_btn.connect("clicked", self.on_select_output)
@@ -784,6 +789,90 @@ class RecorderApp(Adw.Application):
         self.recording_path = None
         self._refresh_file_list()
         self._toast("录音已保存")
+
+    # ──────────────────────────────────────────
+    # 导入音频文件
+    # ──────────────────────────────────────────
+    def on_import(self, btn):
+        """打开文件选择器，导入音频文件到输出目录。"""
+        dialog = Gtk.FileDialog()
+        dialog.set_title("导入音频文件")
+
+        # 设置过滤器
+        filter_list = Gio.ListStore.new(Gtk.FileFilter)
+        f = Gtk.FileFilter()
+        f.set_name("音频文件")
+        f.add_mime_type("audio/wav")
+        f.add_mime_type("audio/mpeg")
+        f.add_mime_type("audio/flac")
+        f.add_mime_type("audio/ogg")
+        f.add_mime_type("audio/x-m4a")
+        f.add_mime_type("audio/mp4")
+        f.add_mime_type("audio/opus")
+        f.add_suffix("wav")
+        f.add_suffix("mp3")
+        f.add_suffix("flac")
+        f.add_suffix("ogg")
+        f.add_suffix("m4a")
+        f.add_suffix("opus")
+        f.add_suffix("wma")
+        filter_list.append(f)
+        dialog.set_filters(filter_list)
+        dialog.set_default_filter(f)
+
+        dialog.open_multiple(
+            parent=btn.get_root(),
+            cancellable=None,
+            callback=self._on_import_files_selected,
+        )
+
+    def _on_import_files_selected(self, dialog, result):
+        try:
+            gfiles = dialog.open_multiple_finish(result)
+        except GLib.GError:
+            return
+        if not gfiles:
+            return
+
+        imported = 0
+        imported_folders = []
+        for gfile in gfiles:
+            src = gfile.get_path()
+            if not os.path.isfile(src):
+                continue
+
+            name = os.path.basename(src)
+            name_no_ext, ext = os.path.splitext(name)
+            ext_lower = ext.lower()
+
+            # 创建条目文件夹
+            rec_dir = os.path.join(str(self.output_dir), name_no_ext)
+            os.makedirs(rec_dir, exist_ok=True)
+
+            if ext_lower == ".wav":
+                # 直接复制
+                dst = os.path.join(rec_dir, name)
+                shutil.copy2(src, dst)
+            else:
+                # 用 ffmpeg 转换为 WAV
+                dst = os.path.join(rec_dir, f"{name_no_ext}.wav")
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", src, "-ac", "2", dst],
+                    capture_output=True,
+                    timeout=120,
+                )
+                if not os.path.isfile(dst):
+                    self._toast(f"转换失败: {name}")
+                    continue
+
+            imported += 1
+            imported_folders.append(os.path.basename(rec_dir))
+
+        if imported > 0:
+            self._refresh_file_list()
+            self._toast(f"已导入 {imported} 个文件: {', '.join(imported_folders)}")
+        else:
+            self._toast("没有成功导入任何文件")
 
     # ──────────────────────────────────────────
     # 选择输出路径
