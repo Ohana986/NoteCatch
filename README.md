@@ -22,6 +22,8 @@ bash setup.sh
 
 `setup.sh` 会自动检测系统，列出四项操作：系统依赖 → Python 虚拟环境 → pip 依赖 → CLI 工具（demucs、basic-pitch）。确认后一键执行，无需手动操作。
 
+如需卸载：`bash uninstall.sh`。
+
 安装后使用：
 
 ```bash
@@ -53,6 +55,8 @@ uv run gui.py
 
 ```
 audio-analyzer/
+├── setup.sh                       # 一键安装
+├── uninstall.sh                   # 一键卸载
 ├── tools/                         # 所有脚本
 │   ├── record-system-audio.sh     # 系统音频录制（PipeWire/PulseAudio）
 │   ├── vocal_extract.py           # Demucs 人声分离
