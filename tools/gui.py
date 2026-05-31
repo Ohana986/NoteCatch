@@ -274,10 +274,10 @@ class RecordingRow(Gtk.ListBoxRow):
         return os.path.isfile(paths["vocals"]) and os.path.isfile(paths["midi"])
 
     def _mark_processed(self):
-        """标记为已处理，按钮变为绿色 ✓。"""
+        """标记为已处理，按钮变为绿色对号图标。"""
         self._processed = True
-        self.process_btn.set_label("✓")
-        self.process_btn.set_icon_name("")
+        self.process_btn.set_label("")
+        self.process_btn.set_icon_name("emblem-ok-symbolic")
         self.process_btn.add_css_class("success")
         self.process_btn.set_sensitive(False)
         self.process_btn.set_tooltip_text("处理完成")
@@ -531,10 +531,9 @@ class RecorderApp(Adw.Application):
         css_provider.load_from_string("""
             .success {
                 color: @success_color;
-                font-weight: bold;
             }
-            .icon-only {
-                opacity: 0.75;
+            button.flat:not(.destructive-action) {
+                opacity: 0.8;
             }
         """)
         Gtk.StyleContext.add_provider_for_display(
@@ -624,6 +623,7 @@ class RecorderApp(Adw.Application):
 
         self.dir_btn = Gtk.Button(label="输出路径")
         self.dir_btn.set_icon_name("folder-open-symbolic")
+        self.dir_btn.set_tooltip_text("选择录音文件的输出目录")
         self.dir_btn.connect("clicked", self.on_select_output)
         btn_box.append(self.dir_btn)
 
