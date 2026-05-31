@@ -9,6 +9,8 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  audio-analyzer 环境安装${NC}"
 echo -e "${CYAN}========================================${NC}"
@@ -22,45 +24,94 @@ else
     OS="unknown"
 fi
 
-# ── 列出将要执行的操作 ──
-echo -e "${YELLOW}── 将要执行的操作 ──${NC}"
-echo ""
-echo -e "  ${GREEN}1.${NC} 创建 Python 虚拟环境：  $(pwd)/.venv"
-echo -e "  ${GREEN}2.${NC} 安装 Python 依赖："
-while IFS= read -r line; do
-    [ -n "$line" ] && echo "      • $line"
-done < "$(dirname "$0")/requirements.txt"
+# ── 检查 Python ──
+if ! command -v python3 &>/dev/null; then
+    echo -e "${RED}❌ 未找到 python3，请先安装 Python 3.10+${NC}"
+    exit 1
+fi
+PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+echo -e "${GREEN}✅ Python $PYVER${NC}"
 echo ""
 
+# ════════════════════════════════════════════
+# 收集所有操作
+# ════════════════════════════════════════════
+
+# ── 1) 系统依赖 ──
 case "$OS" in
     fedora|rhel|centos)
-        echo -e "  ${GREEN}3.${NC} 系统依赖（需手动执行）："
-        echo "      sudo dnf install python3-gobject gtk4 libadwaita \\"
-        echo "          gstreamer1-plugins-good gstreamer1-plugins-base \\"
-        echo "          pulseaudio-utils ffmpeg pipx"
+        SYS_PKGS=("python3-gobject" "gtk4" "libadwaita" "gstreamer1-plugins-good" "gstreamer1-plugins-base" "pulseaudio-utils" "ffmpeg" "pipx")
+        SYS_CMD="sudo dnf install -y ${SYS_PKGS[*]}"
+        SYS_LABEL="系统依赖 (dnf)"
         ;;
     debian|ubuntu)
-        echo -e "  ${GREEN}3.${NC} 系统依赖（需手动执行）："
-        echo "      sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \\"
-        echo "          gstreamer1.0-plugins-good gstreamer1.0-plugins-base \\"
-        echo "          pulseaudio-utils ffmpeg pipx"
+        SYS_PKGS=("python3-gi" "gir1.2-gtk-4.0" "gir1.2-adw-1" "gstreamer1.0-plugins-good" "gstreamer1.0-plugins-base" "pulseaudio-utils" "ffmpeg" "pipx")
+        SYS_CMD="sudo apt update && sudo apt install -y ${SYS_PKGS[*]}"
+        SYS_LABEL="系统依赖 (apt)"
         ;;
     *)
-        echo -e "  ${GREEN}3.${NC} 系统依赖（请手动安装）："
-        echo "      python3-gobject, gtk4, libadwaita, gstreamer1-plugins-good,"
-        echo "      pulseaudio-utils, ffmpeg, pipx"
+        SYS_PKGS=()
+        SYS_CMD=""
+        SYS_LABEL="系统依赖（未知系统，请手动安装以下包）"
+        SYS_MANUAL="python3-gobject, gtk4, libadwaita, gstreamer1-plugins-good, pulseaudio-utils, ffmpeg, pipx"
         ;;
 esac
+
+# ── 2) Python 虚拟环境 ──
+VENV_DIR="$SCRIPT_DIR/.venv"
+VENV_EXISTS=false
+[ -d "$VENV_DIR" ] && VENV_EXISTS=true
+
+# ── 3) pip 依赖 ──
+PIP_PKGS=()
+while IFS= read -r line; do
+    line="${line%%#*}"        # 去掉行内注释
+    line="$(echo "$line" | xargs)"  # trim
+    [ -n "$line" ] && PIP_PKGS+=("$line")
+done < "$SCRIPT_DIR/requirements.txt"
+
+# ── 4) pipx CLI 工具 ──
+PIPX_TOOLS=("demucs" "basic-pitch")
+
+# ════════════════════════════════════════════
+# 展示所有操作
+# ════════════════════════════════════════════
+
+echo -e "${YELLOW}── 将要执行的操作 ──${NC}"
 echo ""
 
-echo -e "  ${GREEN}4.${NC} CLI 工具（需手动执行）："
-echo "      pipx install demucs"
-echo "      pipx install basic-pitch"
+# 1
+echo -e "  ${GREEN}1.${NC} $SYS_LABEL"
+if [ ${#SYS_PKGS[@]} -gt 0 ]; then
+    for pkg in "${SYS_PKGS[@]}"; do
+        echo "      • $pkg"
+    done
+else
+    echo "      $SYS_MANUAL"
+fi
 echo ""
 
-echo -e "${YELLOW}────────────────────────────────────────${NC}"
-echo -e "  脚本将自动执行 ${GREEN}步骤 1-2${NC}（创建 venv + pip 安装）。"
-echo -e "  ${GREEN}步骤 3-4${NC} 需要 sudo/pipx，请手动执行。"
+# 2
+echo -n "  ${GREEN}2.${NC} Python 虚拟环境: "
+if $VENV_EXISTS; then
+    echo -e "$VENV_DIR ${YELLOW}(已存在，将跳过创建)${NC}"
+else
+    echo "创建 $VENV_DIR"
+fi
+echo ""
+
+# 3
+echo -e "  ${GREEN}3.${NC} pip 依赖:"
+for pkg in "${PIP_PKGS[@]}"; do
+    echo "      • $pkg"
+done
+echo ""
+
+# 4
+echo -e "  ${GREEN}4.${NC} pipx CLI 工具:"
+for tool in "${PIPX_TOOLS[@]}"; do
+    echo "      • $tool"
+done
 echo ""
 
 # ── 确认 ──
@@ -72,31 +123,51 @@ fi
 
 echo ""
 
-# ── 检查 Python ──
-if ! command -v python3 &>/dev/null; then
-    echo -e "${RED}❌ 未找到 python3，请先安装 Python 3.10+${NC}"
-    exit 1
-fi
-PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-echo -e "${GREEN}✅ Python $PYVER${NC}"
+# ════════════════════════════════════════════
+# 执行
+# ════════════════════════════════════════════
 
-# ── 创建 venv ──
-VENV_DIR="$(dirname "$0")/.venv"
-if [ -d "$VENV_DIR" ]; then
-    echo -e "${YELLOW}⚠ 虚拟环境已存在，跳过创建${NC}"
+TOTAL=4
+
+# ── 1) 系统依赖 ──
+echo -e "${CYAN}── [1/$TOTAL] $SYS_LABEL ──${NC}"
+if [ -n "$SYS_CMD" ]; then
+    eval "$SYS_CMD"
+    echo -e "  ${GREEN}✅ 完成${NC}"
 else
-    echo "── 创建虚拟环境 ──"
-    python3 -m venv "$VENV_DIR"
-    echo -e "${GREEN}✅ 虚拟环境已创建${NC}"
+    echo -e "  ${YELLOW}⚠ 请手动安装：$SYS_MANUAL${NC}"
 fi
+echo ""
 
-# ── 安装 Python 依赖 ──
-echo "── 安装 Python 依赖 ──"
-"$VENV_DIR/bin/pip" install -r "$(dirname "$0")/requirements.txt"
-echo -e "${GREEN}✅ Python 依赖安装完成${NC}"
+# ── 2) 虚拟环境 ──
+echo -e "${CYAN}── [2/$TOTAL] Python 虚拟环境 ──${NC}"
+if $VENV_EXISTS; then
+    echo "  ⏭ 已存在，跳过创建"
+else
+    python3 -m venv "$VENV_DIR"
+    echo -e "  ${GREEN}✅ 已创建${NC}"
+fi
+echo ""
+
+# ── 3) pip 依赖 ──
+echo -e "${CYAN}── [3/$TOTAL] pip 依赖 ──${NC}"
+"$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+echo -e "  ${GREEN}✅ 完成${NC}"
+echo ""
+
+# ── 4) pipx CLI 工具 ──
+echo -e "${CYAN}── [4/$TOTAL] pipx CLI 工具 ──${NC}"
+for tool in "${PIPX_TOOLS[@]}"; do
+    if pipx list 2>/dev/null | grep -q "package $tool "; then
+        echo "  ⏭ $tool 已安装，跳过"
+    else
+        pipx install "$tool"
+        echo -e "  ${GREEN}✅ $tool 安装完成${NC}"
+    fi
+done
+echo ""
 
 # ── 完成 ──
-echo ""
 echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}  安装完成！${NC}"
 echo ""
@@ -107,6 +178,4 @@ echo -e "    python gui.py"
 echo ""
 echo -e "  或直接运行："
 echo -e "    ${GREEN}.venv/bin/python tools/gui.py${NC}"
-echo ""
-echo -e "  ${YELLOW}⚠ 请确保已安装系统依赖和 CLI 工具（步骤 3-4）${NC}"
 echo -e "${CYAN}========================================${NC}"
