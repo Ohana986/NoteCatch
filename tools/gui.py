@@ -609,6 +609,16 @@ class RecorderApp(Adw.Application):
         self.path_label.add_css_class("caption")
         self.path_label.set_tooltip_text(str(self.output_dir))
         path_box.append(self.path_label)
+
+        # 打开文件夹按钮
+        open_btn = Gtk.Button()
+        open_btn.set_icon_name("document-open-symbolic")
+        open_btn.add_css_class("flat")
+        open_btn.add_css_class("compact")
+        open_btn.set_tooltip_text("在文件管理器中打开")
+        open_btn.connect("clicked", self._on_open_folder)
+        path_box.append(open_btn)
+
         main_box.append(path_box)
 
         # ── 录制提示 ──
@@ -790,6 +800,12 @@ class RecorderApp(Adw.Application):
                 self._refresh_file_list()
         except GLib.GError:
             pass
+
+    def _on_open_folder(self, btn):
+        """在系统文件管理器中打开输出目录。"""
+        subprocess.Popen(["xdg-open", str(self.output_dir)],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
 
     # ──────────────────────────────────────────
     # 文件列表管理
