@@ -637,6 +637,7 @@ class RecorderApp(Adw.Application):
         # ── 文件列表 ──
         list_header = Gtk.Label(label="录音文件", xalign=0)
         list_header.add_css_class("heading")
+        list_header.set_margin_bottom(8)
         main_box.append(list_header)
 
         self.file_list = Gtk.ListBox()
