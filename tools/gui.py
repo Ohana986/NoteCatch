@@ -15,7 +15,7 @@ import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 gi.require_version('Gst', '1.0')
-from gi.repository import Gtk, Adw, GLib, Gio, Gst
+from gi.repository import Gtk, Adw, GLib, Gio, Gst, Gdk
 import subprocess
 import os
 import sys
@@ -186,7 +186,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.process_btn)
 
         # 隐藏
-        hide_btn = Gtk.Button()
+        hide_btn = Gtk.Button(label="隐藏")
         hide_btn.set_icon_name("eye-not-looking-symbolic")
         hide_btn.add_css_class("flat")
         hide_btn.add_css_class("compact")
@@ -195,7 +195,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(hide_btn)
 
         # 删除
-        delete_btn = Gtk.Button()
+        delete_btn = Gtk.Button(label="删除")
         delete_btn.set_icon_name("user-trash-symbolic")
         delete_btn.add_css_class("flat")
         delete_btn.add_css_class("compact")
@@ -268,10 +268,11 @@ class RecordingRow(Gtk.ListBoxRow):
         return os.path.isfile(paths["vocals"]) and os.path.isfile(paths["midi"])
 
     def _mark_processed(self):
-        """标记为已处理，按钮变为 ✓。"""
+        """标记为已处理，按钮变为绿色 ✓。"""
         self._processed = True
         self.process_btn.set_label("✓")
-        self.process_btn.set_icon_name("emblem-ok-symbolic")
+        self.process_btn.set_icon_name("")
+        self.process_btn.add_css_class("success")
         self.process_btn.set_sensitive(False)
         self.process_btn.set_tooltip_text("处理完成")
 
@@ -511,6 +512,23 @@ class RecorderApp(Adw.Application):
         win.set_default_size(580, 680)
         win.set_title("录音分析工具")
         win.set_resizable(True)
+
+        # ── CSS 样式 ──
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_string(b"""
+            .success {
+                color: @success_color;
+                font-weight: bold;
+            }
+            .icon-only {
+                opacity: 0.75;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
 
         # ── 工具箱 ──
         toolbar_view = Adw.ToolbarView()
