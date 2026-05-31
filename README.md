@@ -2,18 +2,32 @@
 
 录制系统音频输出 → Demucs 人声分离 → Basic Pitch / pYIN 音高分析 → MIDI / 五线谱 / 纯音合成。
 
-## 依赖安装
+## 环境准备（首次使用）
 
 ```bash
-# CLI 工具（全局安装）
+# 1. 克隆仓库
+git clone https://github.com/Ohana986/audio-analyzer.git
+cd audio-analyzer
+
+# 2. 安装 uv（Python 包管理器）
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. 安装系统依赖
+# Fedora:
+sudo dnf install python3-gobject gtk4 libadwaita \
+    gstreamer1-plugins-good gstreamer1-plugins-base \
+    pulseaudio-utils ffmpeg
+# Debian/Ubuntu:
+sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-base \
+    pulseaudio-utils ffmpeg
+
+# 4. 安装 CLI 工具（全局）
 uv tool install demucs
 uv tool install --python 3.11 basic-pitch
-
-# 系统包（Fedora）
-sudo dnf install pulseaudio-utils ffmpeg gstreamer1-plugins-good
 ```
 
-各 Python 脚本通过 [PEP 723](https://peps.python.org/pep-0723/) 内联声明依赖，`uv run` 自动处理。GUI 需要系统级 `gtk4`、`libadwaita`、`gstreamer1.0` 及 Python 绑定。
+各 Python 脚本通过 [PEP 723](https://peps.python.org/pep-0723/) 内联声明依赖，`uv run` 自动处理，无需手动 `pip install`。
 
 ## 项目结构
 
