@@ -3,18 +3,19 @@
 # ///
 
 """
-录音分析 GUI — GNOME 风格 (GTK4 + Adwaita)
+录音分析 GUI — GNOME 风格 (GTK4 + Adwaita + GStreamer)
 
 使用:
     python3 gui.py
 
-依赖系统包: gtk4, libadwaita, python3-gobject, pulseaudio-utils
+依赖系统包: gtk4, libadwaita, python3-gobject, gstreamer1.0, pulseaudio-utils
 """
 
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio
+gi.require_version('Gst', '1.0')
+from gi.repository import Gtk, Adw, GLib, Gio, Gst
 import subprocess
 import os
 import sys
@@ -25,7 +26,12 @@ import math
 import re
 from pathlib import Path
 
+Gst.init(None)
+
 SCRIPT_DIR = Path(__file__).parent.resolve()
+sys.path.insert(0, str(SCRIPT_DIR))
+from common import get_project_root, get_output_path, resolve_paths
+from common import CAT_AUDIO, CAT_MIDI, CAT_DATA, CAT_PLOTS, CAT_SHEETS
 
 
 # ──────────────────────────────────────────────
@@ -67,14 +73,16 @@ class WaveformLogo(Gtk.DrawingArea):
 
 
 # ──────────────────────────────────────────────
-# 查找音频 Sink
+# 查找音频 Sink（locale 无关）
 # ──────────────────────────────────────────────
 def find_recording_sink():
-    """返回 (sink_id, format, rate) 或 None。"""
+    """返回 (sink_id, format, rate) 或 None。使用 LANG=C 避免中文 locale 问题。"""
+    env_c = os.environ.copy()
+    env_c["LANG"] = "C"
     try:
         out = subprocess.check_output(
             ["pactl", "list", "sinks", "short"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True, stderr=subprocess.DEVNULL, env=env_c,
         )
         sink_id = None
         for line in out.strip().split("\n"):
@@ -89,21 +97,19 @@ def find_recording_sink():
 
         long_out = subprocess.check_output(
             ["pactl", "list", "sinks"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True, stderr=subprocess.DEVNULL, env=env_c,
         )
         fmt = "s16le"
         rate = "48000"
         in_target = False
         for line in long_out.split("\n"):
-            m_id = re.match(r"(?:信宿|Sink)\s+#(\d+)", line)
+            m_id = re.match(r"Sink\s+#(\d+)", line)
             if m_id:
                 in_target = (m_id.group(1) == sink_id)
                 continue
             if not in_target:
                 continue
-            m_spec = re.search(
-                r"(?:采样规格|Sample\s+Specification)[：:]\s*(.+)", line,
-            )
+            m_spec = re.search(r"Sample Specification:\s*(.+)", line)
             if m_spec:
                 spec_raw = m_spec.group(1).strip()
                 parts = spec_raw.split()
@@ -123,12 +129,20 @@ def find_recording_sink():
 # 录音文件列表行
 # ──────────────────────────────────────────────
 class RecordingRow(Gtk.ListBoxRow):
-    """文件列表中的一行：文件名 + 播放 / 处理 / 隐藏 / 删除 + 内嵌进度条。"""
+    """每行：播放(含拖动进度) / 处理 / 隐藏 / 删除。"""
 
-    def __init__(self, filepath, on_play, on_process, on_hide, on_delete):
+    def __init__(self, filepath, on_process, on_hide, on_delete, app):
         super().__init__()
         self.filepath = filepath
         self.basename = os.path.basename(filepath)
+        self._app = app  # RecorderApp 引用，用于独占播放协调
+
+        # ── GStreamer 播放器 ──
+        self._player: Gst.Element | None = None
+        self._bus_watch_id: int = 0
+        self._pos_update_id: int = 0
+        self._duration_ns: int = 0
+        self._seeking: bool = False  # 用户正在拖动时跳过自动更新
 
         # ── 顶层垂直容器 ──
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -153,14 +167,14 @@ class RecordingRow(Gtk.ListBoxRow):
         name_label.add_css_class("body")
         row.append(name_label)
 
-        # 播放录音
-        play_btn = Gtk.Button(label="播放")
-        play_btn.set_icon_name("media-playback-start-symbolic")
-        play_btn.add_css_class("flat")
-        play_btn.add_css_class("compact")
-        play_btn.set_tooltip_text("播放原始录音")
-        play_btn.connect("clicked", lambda b: on_play(self.filepath))
-        row.append(play_btn)
+        # 播放按钮
+        self.play_btn = Gtk.Button(label="播放")
+        self.play_btn.set_icon_name("media-playback-start-symbolic")
+        self.play_btn.add_css_class("flat")
+        self.play_btn.add_css_class("compact")
+        self.play_btn.set_tooltip_text("播放 / 暂停")
+        self.play_btn.connect("clicked", self._on_play_toggle)
+        row.append(self.play_btn)
 
         # 开始处理
         self.process_btn = Gtk.Button(label="处理")
@@ -172,7 +186,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(self.process_btn)
 
         # 隐藏
-        hide_btn = Gtk.Button(label="隐藏")
+        hide_btn = Gtk.Button()
         hide_btn.set_icon_name("eye-not-looking-symbolic")
         hide_btn.add_css_class("flat")
         hide_btn.add_css_class("compact")
@@ -181,7 +195,7 @@ class RecordingRow(Gtk.ListBoxRow):
         row.append(hide_btn)
 
         # 删除
-        delete_btn = Gtk.Button(label="删除")
+        delete_btn = Gtk.Button()
         delete_btn.set_icon_name("user-trash-symbolic")
         delete_btn.add_css_class("flat")
         delete_btn.add_css_class("compact")
@@ -192,42 +206,252 @@ class RecordingRow(Gtk.ListBoxRow):
 
         outer.append(row)
 
-        # ── 进度区域 (Revealer 展开) ──
-        self.progress_revealer = Gtk.Revealer()
-        self.progress_revealer.set_transition_type(
-            Gtk.RevealerTransitionType.SLIDE_DOWN
-        )
-        self.progress_revealer.set_transition_duration(200)
+        # ── 播放进度区域 ──
+        self._play_revealer = Gtk.Revealer()
+        self._play_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self._play_revealer.set_transition_duration(200)
 
-        progress_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=4,
-        )
-        progress_box.set_margin_start(36)
-        progress_box.set_margin_end(12)
-        progress_box.set_margin_bottom(6)
+        play_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        play_box.set_margin_start(36)
+        play_box.set_margin_end(12)
+        play_box.set_margin_bottom(6)
 
-        self.progress_label = Gtk.Label(label="", xalign=0)
-        self.progress_label.add_css_class("caption")
-        progress_box.append(self.progress_label)
+        self._play_label = Gtk.Label(label="", xalign=0)
+        self._play_label.add_css_class("caption")
+        play_box.append(self._play_label)
 
-        self.progress_bar = Gtk.ProgressBar(hexpand=True)
-        progress_box.append(self.progress_bar)
+        # 拖动进度条
+        self._play_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0.0, 100.0, 1.0)
+        self._play_scale.set_draw_value(False)
+        self._play_scale.set_hexpand(True)
+        self._play_scale.set_sensitive(False)
+        self._play_scale.connect("change-value", self._on_scale_drag)
+        play_box.append(self._play_scale)
 
-        self.progress_revealer.set_child(progress_box)
-        outer.append(self.progress_revealer)
+        self._play_revealer.set_child(play_box)
+        outer.append(self._play_revealer)
+
+        # ── 处理进度区域 ──
+        self._proc_revealer = Gtk.Revealer()
+        self._proc_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self._proc_revealer.set_transition_duration(200)
+
+        proc_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        proc_box.set_margin_start(36)
+        proc_box.set_margin_end(12)
+        proc_box.set_margin_bottom(6)
+
+        self._proc_label = Gtk.Label(label="", xalign=0)
+        self._proc_label.add_css_class("caption")
+        proc_box.append(self._proc_label)
+
+        self._proc_bar = Gtk.ProgressBar(hexpand=True)
+        proc_box.append(self._proc_bar)
+
+        self._proc_revealer.set_child(proc_box)
+        outer.append(self._proc_revealer)
 
         self.set_child(outer)
 
-    # ── 进度 UI ──
+        self._playing = False
+        self._paused = False
+
+    # ── 播放逻辑 (GStreamer) ──
+    def _on_play_toggle(self, btn):
+        if self._playing and not self._paused:
+            # 正在播放 → 暂停
+            self._pause()
+        elif self._playing and self._paused:
+            # 已暂停 → 继续
+            self._resume()
+        else:
+            # 开始播放
+            self._start_playback()
+
+    def _start_playback(self):
+        if not os.path.isfile(self.filepath):
+            return
+
+        # 独占播放：先停掉前一个
+        self._app._stop_other_player(self)
+
+        # 清理旧 pipeline（如果有）
+        self._cleanup_player()
+
+        # 创建新 pipeline
+        uri = Gst.filename_to_uri(self.filepath)
+        self._player = Gst.ElementFactory.make("playbin", None)
+        if self._player is None:
+            self._app._toast("无法创建 GStreamer 播放器")
+            return
+        self._player.set_property("uri", uri)
+
+        # 监听 bus 消息
+        bus = self._player.get_bus()
+        bus.add_signal_watch()
+        self._bus_watch_id = bus.connect("message", self._on_gst_message)
+
+        # 开始播放
+        ret = self._player.set_state(Gst.State.PLAYING)
+        if ret == Gst.StateChangeReturn.FAILURE:
+            self._app._toast("播放失败")
+            self._cleanup_player()
+            return
+
+        self._playing = True
+        self._paused = False
+        self._duration_ns = 0
+        self._seeking = False
+        self.play_btn.set_label("暂停")
+        self.play_btn.set_icon_name("media-playback-pause-symbolic")
+        self._play_revealer.set_reveal_child(True)
+        self._play_scale.set_value(0.0)
+        self._play_scale.set_sensitive(False)
+        self._play_label.set_label("▶ 播放中...")
+
+    def _on_gst_message(self, bus, msg):
+        t = msg.type
+        if t == Gst.MessageType.EOS:
+            # 播放结束
+            GLib.idle_add(self._on_playback_end)
+        elif t == Gst.MessageType.ERROR:
+            err, dbg = msg.parse_error()
+            print(f"GStreamer 错误: {err}", file=sys.stderr)
+            GLib.idle_add(self._on_playback_end)
+        elif t == Gst.MessageType.STATE_CHANGED:
+            old, new, pending = msg.parse_state_changed()
+            if msg.src == self._player:
+                if new == Gst.State.PAUSED and old == Gst.State.READY:
+                    # 预卷完成，获取时长并开始进度更新
+                    GLib.idle_add(self._on_ready)
+        elif t == Gst.MessageType.DURATION_CHANGED:
+            GLib.idle_add(self._update_duration)
+
+    def _on_ready(self):
+        self._update_duration()
+        self._play_scale.set_sensitive(True)
+        self._start_position_updates()
+
+    def _update_duration(self):
+        if self._player is None:
+            return
+        ok, dur = self._player.query_duration(Gst.Format.TIME)
+        if ok:
+            self._duration_ns = dur
+            self._play_scale.set_range(0.0, dur / Gst.SECOND)
+
+    def _start_position_updates(self):
+        if self._pos_update_id:
+            GLib.source_remove(self._pos_update_id)
+        self._pos_update_id = GLib.timeout_add(200, self._update_position)
+
+    def _update_position(self):
+        if self._player is None or self._seeking:
+            return True  # 继续轮询
+        ok, pos = self._player.query_position(Gst.Format.TIME)
+        if ok and self._duration_ns > 0:
+            seconds = pos / Gst.SECOND
+            dur_sec = self._duration_ns / Gst.SECOND
+            frac = seconds / dur_sec if dur_sec > 0 else 0
+            self._play_scale.set_value(seconds)
+            m = int(seconds // 60)
+            s = int(seconds % 60)
+            self._play_label.set_label(f"▶ {m}:{s:02d}")
+        return True  # 继续轮询
+
+    def _on_scale_drag(self, scale, scroll, value):
+        """用户拖动进度条时触发。"""
+        if self._player is None:
+            return
+        self._seeking = True
+        seek_ns = int(value * Gst.SECOND)
+        self._player.seek_simple(
+            Gst.Format.TIME,
+            Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
+            seek_ns)
+        # 短延迟后恢复位置更新
+        GLib.timeout_add(300, self._clear_seeking)
+        m = int(value // 60)
+        s = int(value % 60)
+        self._play_label.set_label(f"▶ {m}:{s:02d}")
+
+    def _clear_seeking(self):
+        self._seeking = False
+
+    def _pause(self):
+        if self._player is None:
+            return
+        self._player.set_state(Gst.State.PAUSED)
+        self._paused = True
+        self.play_btn.set_label("继续")
+        self.play_btn.set_icon_name("media-playback-start-symbolic")
+        self._play_label.set_label("⏸ 已暂停")
+        if self._pos_update_id:
+            GLib.source_remove(self._pos_update_id)
+            self._pos_update_id = 0
+
+    def _resume(self):
+        if self._player is None:
+            return
+        self._player.set_state(Gst.State.PLAYING)
+        self._paused = False
+        self.play_btn.set_label("暂停")
+        self.play_btn.set_icon_name("media-playback-pause-symbolic")
+        self._play_label.set_label("▶ 播放中...")
+        self._start_position_updates()
+
+    def stop_playback(self):
+        """从外部停止播放（被新播放条目抢占时调用）。"""
+        if self._player is not None:
+            self._player.set_state(Gst.State.NULL)
+        self._cleanup_player()
+        self._playing = False
+        self._paused = False
+        self.play_btn.set_label("播放")
+        self.play_btn.set_icon_name("media-playback-start-symbolic")
+        self._play_label.set_label("")
+        self._play_revealer.set_reveal_child(False)
+
+    def _on_playback_end(self):
+        """播放自然结束。"""
+        self._cleanup_player()
+        self._playing = False
+        self._paused = False
+        self.play_btn.set_label("播放")
+        self.play_btn.set_icon_name("media-playback-start-symbolic")
+        self._play_scale.set_sensitive(False)
+        self._play_label.set_label("播放完毕")
+        GLib.timeout_add_seconds(2, self._hide_play_progress)
+        self._app._on_player_done(self)
+
+    def _cleanup_player(self):
+        if self._pos_update_id:
+            GLib.source_remove(self._pos_update_id)
+            self._pos_update_id = 0
+        if self._bus_watch_id and self._player:
+            bus = self._player.get_bus()
+            bus.remove_signal_watch()
+            bus.disconnect(self._bus_watch_id)
+            self._bus_watch_id = 0
+        if self._player:
+            self._player.set_state(Gst.State.NULL)
+            self._player = None
+        self._seeking = False
+
+    def _hide_play_progress(self):
+        self._play_revealer.set_reveal_child(False)
+
+    # ── 处理进度 UI ──
     def show_progress(self, text, fraction):
         self.process_btn.set_sensitive(False)
-        self.progress_revealer.set_reveal_child(True)
-        self.progress_label.set_label(text)
-        self.progress_bar.set_fraction(fraction)
+        self._proc_revealer.set_reveal_child(True)
+        self._proc_label.set_label(text)
+        self._proc_bar.set_fraction(fraction)
 
     def hide_progress(self):
         self.process_btn.set_sensitive(True)
-        self.progress_revealer.set_reveal_child(False)
+        self._proc_revealer.set_reveal_child(False)
 
 
 # ──────────────────────────────────────────────
@@ -245,9 +469,22 @@ class RecorderApp(Adw.Application):
         self.output_dir = SCRIPT_DIR.parent / "recordings"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.rows: list[RecordingRow] = []
-        self.active_row: RecordingRow | None = None  # 正在处理的
+        self.active_row: RecordingRow | None = None
+        self._playing_row: RecordingRow | None = None
         self._hidden_file = self.output_dir / ".hidden_recordings"
         self._hidden_set: set[str] = self._load_hidden()
+
+    # ── 独占播放协调 ──
+    def _stop_other_player(self, current: RecordingRow):
+        """停止其他正在播放的条目。"""
+        if self._playing_row is not None and self._playing_row is not current:
+            self._playing_row.stop_playback()
+        self._playing_row = current
+
+    def _on_player_done(self, row: RecordingRow):
+        """播放结束回调。"""
+        if self._playing_row is row:
+            self._playing_row = None
 
     def do_activate(self):
         win = Adw.ApplicationWindow(application=self)
@@ -255,17 +492,15 @@ class RecorderApp(Adw.Application):
         win.set_title("录音分析工具")
         win.set_resizable(True)
 
-        # ── 工具箱 (含 HeaderBar + 内容) ──
+        # ── 工具箱 ──
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         header.set_show_title(True)
         toolbar_view.add_top_bar(header)
 
-        # ── 外层滚动容器 ──
         scrolled = Gtk.ScrolledWindow(vexpand=True)
         scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
-        # ── 主布局 ──
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         main_box.set_margin_top(24)
         main_box.set_margin_bottom(16)
@@ -338,7 +573,7 @@ class RecorderApp(Adw.Application):
         path_box.append(self.path_label)
         main_box.append(path_box)
 
-        # ── 进度条 (录制时显示) ──
+        # ── 录制提示 ──
         self.recording_hint = Gtk.Label(label="", xalign=0)
         self.recording_hint.add_css_class("caption")
         self.recording_hint.set_margin_top(6)
@@ -351,12 +586,11 @@ class RecorderApp(Adw.Application):
         sep2.set_margin_bottom(6)
         main_box.append(sep2)
 
-        # ── 文件列表标头 ──
+        # ── 文件列表 ──
         list_header = Gtk.Label(label="录音文件", xalign=0)
         list_header.add_css_class("heading")
         main_box.append(list_header)
 
-        # ── 文件列表 ──
         self.file_list = Gtk.ListBox()
         self.file_list.add_css_class("boxed-list")
         self.file_list.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -374,7 +608,6 @@ class RecorderApp(Adw.Application):
         win.set_content(toolbar_view)
         win.present()
 
-        # 初始扫描文件列表
         self._refresh_file_list()
 
     # ──────────────────────────────────────────
@@ -415,7 +648,9 @@ class RecorderApp(Adw.Application):
         device = f"{sink_id}.monitor"
         ts = time.strftime("%Y%m%d_%H%M%S")
         out_name = f"系统录音_{ts}.wav"
-        out_path = os.path.join(str(self.output_dir), out_name)
+        audio_subdir = os.path.join(str(self.output_dir), CAT_AUDIO)
+        os.makedirs(audio_subdir, exist_ok=True)
+        out_path = os.path.join(audio_subdir, out_name)
 
         try:
             proc = subprocess.Popen(
@@ -444,7 +679,7 @@ class RecorderApp(Adw.Application):
         self._toast("开始录音")
 
     # ──────────────────────────────────────────
-    # 暂停 / 继续
+    # 暂停 / 继续录音
     # ──────────────────────────────────────────
     def on_pause(self, btn):
         if self.recording_process is None:
@@ -453,13 +688,11 @@ class RecorderApp(Adw.Application):
         name = os.path.basename(self.recording_path) if self.recording_path else ""
 
         if self.recording_paused:
-            # 继续录制
             proc.send_signal(signal.SIGCONT)
             self.recording_paused = False
             self._set_recording_state(name)
             self._toast("继续录制")
         else:
-            # 暂停录制
             proc.send_signal(signal.SIGSTOP)
             self.recording_paused = True
             self._set_paused_state(name)
@@ -475,7 +708,6 @@ class RecorderApp(Adw.Application):
         proc = self.recording_process
         self.recording_process = None
 
-        # 如果处于暂停状态，先 SIGCONT 让进程响应 SIGINT
         if self.recording_paused:
             proc.send_signal(signal.SIGCONT)
             self.recording_paused = False
@@ -523,22 +755,31 @@ class RecorderApp(Adw.Application):
     # 文件列表管理
     # ──────────────────────────────────────────
     def _get_recording_wavs(self):
-        """返回目录中的原始录音文件（排除生成文件和已隐藏文件）。"""
         exclude = ("_vocals", "_play", "_mixed", "_segments")
         wavs = []
-        for f in os.listdir(str(self.output_dir)):
-            if not f.endswith(".wav"):
+        # 优先搜索 audio/ 子目录，再回退根目录
+        audio_dir = self.output_dir / CAT_AUDIO
+        search_dirs = [audio_dir] if audio_dir.is_dir() else []
+        search_dirs.append(self.output_dir)
+        seen = set()
+        for sd in search_dirs:
+            if not sd.is_dir():
                 continue
-            if any(x in f for x in exclude):
-                continue
-            path = os.path.join(str(self.output_dir), f)
-            if os.path.isfile(path) and f not in self._hidden_set:
-                wavs.append(path)
+            for f in os.listdir(str(sd)):
+                if not f.endswith(".wav"):
+                    continue
+                if any(x in f for x in exclude):
+                    continue
+                if f in seen:
+                    continue
+                seen.add(f)
+                path = os.path.join(str(sd), f)
+                if os.path.isfile(path) and f not in self._hidden_set:
+                    wavs.append(path)
         wavs.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         return wavs
 
     def _load_hidden(self) -> set:
-        """加载被隐藏的文件名集合。"""
         if self._hidden_file.is_file():
             try:
                 with open(self._hidden_file, encoding="utf-8") as fh:
@@ -548,7 +789,6 @@ class RecorderApp(Adw.Application):
         return set()
 
     def _save_hidden(self):
-        """保存被隐藏的文件名集合。"""
         try:
             with open(self._hidden_file, "w", encoding="utf-8") as fh:
                 for name in sorted(self._hidden_set):
@@ -558,14 +798,18 @@ class RecorderApp(Adw.Application):
 
     def _refresh_file_list(self):
         """重新扫描目录并重建文件列表。同时清理已不存在的隐藏条目。"""
-        # 清理隐藏列表中已删除的文件
-        stale = [n for n in self._hidden_set
-                 if not os.path.isfile(self.output_dir / n)]
+        # 清理隐藏列表中已删除的文件（检查所有子目录）
+        all_files = set()
+        for subdir in [CAT_AUDIO, CAT_MIDI, CAT_DATA, CAT_PLOTS, CAT_SHEETS]:
+            sd = self.output_dir / subdir
+            if sd.is_dir():
+                all_files.update(os.listdir(str(sd)))
+        all_files.update(os.listdir(str(self.output_dir)))
+        stale = [n for n in self._hidden_set if n not in all_files]
         if stale:
             self._hidden_set.difference_update(stale)
             self._save_hidden()
 
-        # 清空列表
         while row := self.file_list.get_first_child():
             self.file_list.remove(row)
 
@@ -585,10 +829,10 @@ class RecorderApp(Adw.Application):
         for path in wavs:
             row = RecordingRow(
                 path,
-                on_play=self._on_play_recording,
                 on_process=self._on_process_file,
                 on_hide=self._on_hide_row,
                 on_delete=self._on_delete_row,
+                app=self,
             )
             self.file_list.append(row)
             self.rows.append(row)
@@ -617,17 +861,16 @@ class RecorderApp(Adw.Application):
         t.start()
 
     def _process_worker(self, audio_path):
-        """后台处理线程。"""
         row = self.active_row
         try:
-            scripts_dir = SCRIPT_DIR
-            base = os.path.splitext(audio_path)[0]
-            vocals_path = f"{base}_vocals.wav"
+            paths = resolve_paths(audio_path)
+            vocals_path = paths["vocals"]
+            midi_path = paths["midi"]
 
             # Step 1: Demucs
             GLib.idle_add(row.show_progress, "Demucs 人声分离...", 0.0)
             result = subprocess.run(
-                ["uv", "run", str(scripts_dir / "vocal_extract.py"), audio_path],
+                ["uv", "run", str(SCRIPT_DIR / "vocal_extract.py"), audio_path],
                 capture_output=True, text=True, timeout=600,
                 cwd=str(self.output_dir),
             )
@@ -645,7 +888,7 @@ class RecorderApp(Adw.Application):
             # Step 2: Basic Pitch → MIDI
             GLib.idle_add(row.show_progress, "Basic Pitch 音高分析 → MIDI...", 0.45)
             result = subprocess.run(
-                ["uv", "run", str(scripts_dir / "pitch_basic.py"),
+                ["uv", "run", str(SCRIPT_DIR / "pitch_basic.py"),
                  "--save-midi", "--vocal", vocals_path],
                 capture_output=True, text=True, timeout=600,
                 cwd=str(self.output_dir),
@@ -655,8 +898,6 @@ class RecorderApp(Adw.Application):
                 GLib.idle_add(self._on_proc_done, row, f"Basic Pitch 失败: {err}")
                 return
 
-            # 完成
-            midi_path = f"{vocals_path.replace('.wav', '')}_basic_pitch.mid"
             if os.path.isfile(midi_path):
                 msg = f"✅ {os.path.basename(midi_path)}"
             else:
@@ -670,7 +911,6 @@ class RecorderApp(Adw.Application):
             GLib.idle_add(self._on_proc_done, row, f"处理出错: {e}")
 
     def _on_proc_done(self, row: RecordingRow, msg):
-        """处理完成/失败时清理"""
         row.hide_progress()
         self.active_row = None
         self.statusbar.set_label(msg)
@@ -679,28 +919,16 @@ class RecorderApp(Adw.Application):
         return False
 
     # ──────────────────────────────────────────
-    # 播放录音
-    # ──────────────────────────────────────────
-    def _on_play_recording(self, filepath):
-        if not os.path.isfile(filepath):
-            self._toast("录音文件不存在")
-            return
-        try:
-            subprocess.Popen(["paplay", filepath])
-            self._toast("正在播放...")
-        except FileNotFoundError:
-            self._toast("未找到 paplay")
-        except Exception as e:
-            self._toast(f"播放失败: {e}")
-
-    # ──────────────────────────────────────────
-    # 删除条目 / 删除文件
+    # 隐藏 / 删除
     # ──────────────────────────────────────────
     def _on_hide_row(self, row: RecordingRow):
-        """从列表中移除条目（保留文件，下次刷新不再显示）。"""
         if row is self.active_row:
             self._toast("该文件正在处理中，无法移除")
             return
+        # 停止播放（如果正在播）
+        if self._playing_row is row:
+            row.stop_playback()
+            self._playing_row = None
         self._hidden_set.add(row.basename)
         self._save_hidden()
         self.file_list.remove(row)
@@ -708,26 +936,33 @@ class RecorderApp(Adw.Application):
         self._toast("已从列表移除")
 
     def _on_delete_row(self, row: RecordingRow):
-        """删除文件及所有关联的生成文件。"""
         if row is self.active_row:
             self._toast("该文件正在处理中，无法删除")
             return
 
+        # 停止播放（如果正在播）
+        if self._playing_row is row:
+            row.stop_playback()
+            self._playing_row = None
+
         base = os.path.splitext(row.filepath)[0]
+        fname = os.path.splitext(os.path.basename(row.filepath))[0]
+        root = str(self.output_dir)
         patterns = [
-            row.filepath,                          # 原始录音
-            f"{base}_vocals.wav",                  # 人声
-            f"{base}_vocals_basic_pitch.mid",      # MIDI
-            f"{base}_vocals_segments.csv",         # 音段
-            f"{base}_vocals_play.wav",             # 纯音
-            f"{base}_vocals_mixed.wav",            # 混合
-            f"{base}_vocals_pitch.csv",            # 人声音高
-            f"{base}_vocals_pitch.png",            # 人声音高图
-            f"{base}_pitch.csv",                   # 原始音高
-            f"{base}_pitch.png",                   # 原始音高图
-            f"{base}_segments.csv",                # 原始音段
-            f"{base}_basic_pitch.mid",             # 原始 MIDI
-            f"{base}_full.mid",                    # 完整 MIDI
+            row.filepath,
+            os.path.join(root, CAT_AUDIO, f"{fname}_vocals.wav"),
+            os.path.join(root, CAT_MIDI, f"{fname}_vocals_basic_pitch.mid"),
+            os.path.join(root, CAT_DATA, f"{fname}_vocals_segments.csv"),
+            os.path.join(root, CAT_AUDIO, f"{fname}_vocals_play.wav"),
+            os.path.join(root, CAT_AUDIO, f"{fname}_vocals_mixed.wav"),
+            os.path.join(root, CAT_DATA, f"{fname}_vocals_pitch.csv"),
+            os.path.join(root, CAT_PLOTS, f"{fname}_vocals_pitch.png"),
+            os.path.join(root, CAT_DATA, f"{fname}_pitch.csv"),
+            os.path.join(root, CAT_PLOTS, f"{fname}_pitch.png"),
+            os.path.join(root, CAT_DATA, f"{fname}_segments.csv"),
+            os.path.join(root, CAT_MIDI, f"{fname}_basic_pitch.mid"),
+            os.path.join(root, CAT_MIDI, f"{fname}_full.mid"),
+            os.path.join(root, CAT_SHEETS, f"{fname}.musicxml"),
         ]
 
         deleted = 0
@@ -738,7 +973,6 @@ class RecorderApp(Adw.Application):
 
         self.file_list.remove(row)
         self.rows.remove(row)
-        # 清理隐藏记录（文件已物理删除，无需再隐藏）
         self._hidden_set.discard(row.basename)
         self._save_hidden()
         self._toast(f"已删除 {deleted} 个文件")

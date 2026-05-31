@@ -15,15 +15,20 @@
 
 import sys
 import os
+from pathlib import Path
 
 import music21
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+sys.path.insert(0, str(SCRIPT_DIR))
+from common import get_project_root, get_output_path, CAT_SHEETS, CAT_PLOTS
 
 
 def midi_to_sheet(midi_path: str, key_sig=None, time_sig="4/4",
                   render_png=False):
     midi_path = os.path.abspath(midi_path)
     basename = os.path.splitext(os.path.basename(midi_path))[0]
-    out_dir = os.path.dirname(midi_path)
+    root = get_project_root(midi_path)
 
     print(f"读取: {midi_path}")
     score = music21.converter.parse(midi_path)
@@ -49,14 +54,14 @@ def midi_to_sheet(midi_path: str, key_sig=None, time_sig="4/4",
     # score = score.transpose("C")
 
     # 输出 MusicXML
-    xml_path = os.path.join(out_dir, f"{basename}.musicxml")
+    xml_path = get_output_path(root, f"{basename}.musicxml", CAT_SHEETS)
     score.write("musicxml", fp=xml_path)
     size_kb = os.path.getsize(xml_path) / 1024
     print(f"MusicXML: {xml_path} ({size_kb:.0f} KB)")
 
     # 可选：渲染 PNG（需要 MuseScore 或 LilyPond）
     if render_png:
-        png_path = os.path.join(out_dir, f"{basename}_sheet.png")
+        png_path = get_output_path(root, f"{basename}_sheet.png", CAT_PLOTS)
         try:
             score.write("lily.png", fp=png_path)
             print(f"PNG: {png_path}")

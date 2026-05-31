@@ -5,7 +5,11 @@
 
 set -eu
 
-OUTDIR="$(dirname "$0")"
+# 强制英文 locale，避免 pactl 中文输出导致解析失败
+export LANG=C
+
+OUTDIR="$(dirname "$0")/../recordings/audio"
+mkdir -p "$OUTDIR"
 
 # --- 查找当前有音频输出的 sink（取第一个 RUNNING 的）---
 SINK=$(pactl list sinks short | awk '$NF == "RUNNING" {print $2; exit}')
@@ -20,7 +24,7 @@ if [ -z "$SINK" ]; then
 fi
 
 # --- 从 sink 读取原生采样规格 ---
-spec=$(pactl list sinks | sed -n "/名称：${SINK}$/,/^$/p" | grep "采样规格" | sed 's/.*采样规格：//')
+spec=$(pactl list sinks | sed -n "/Name: ${SINK}$/,/^$/p" | grep "Sample Specification" | sed 's/.*Sample Specification: //')
 native_fmt=$(echo "$spec" | awk '{print $1}')
 native_rate=$(echo "$spec" | awk '{print $3}' | sed 's/Hz//')
 # 兜底

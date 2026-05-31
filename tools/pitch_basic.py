@@ -27,10 +27,15 @@ Basic Pitch 原生 CSV 格式:
 
 import sys
 import os
+from pathlib import Path
 import subprocess
 import tempfile
 import csv
 import shutil
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+sys.path.insert(0, str(SCRIPT_DIR))
+from common import get_project_root, get_output_path, CAT_DATA, CAT_MIDI
 
 _VOCAL_MIN = 80.0
 _VOCAL_MAX = 800.0
@@ -112,7 +117,8 @@ def analyze_basic_pitch(audio_path, output_dir=".",
                         min_vel=0, sensitive=False):
     audio_path = os.path.abspath(audio_path)
     basename = os.path.splitext(os.path.basename(audio_path))[0]
-    seg_path = os.path.join(output_dir, f"{basename}_segments.csv")
+    root = get_project_root(audio_path)
+    seg_path = get_output_path(root, f"{basename}_segments.csv", CAT_DATA)
 
     print(f"加载: {audio_path}")
     print("模型: Basic Pitch (Spotify)")
@@ -189,9 +195,9 @@ def analyze_basic_pitch(audio_path, output_dir=".",
         if save_midi:
             for f in os.listdir(tmpdir):
                 if f.endswith(".mid"):
-                    shutil.copy2(os.path.join(tmpdir, f),
-                                 os.path.join(output_dir, f))
-                    print(f"MIDI: {f}")
+                    midi_out = get_output_path(root, f, CAT_MIDI)
+                    shutil.copy2(os.path.join(tmpdir, f), midi_out)
+                    print(f"MIDI: {f} → {midi_out}")
 
     print(f"音段: {seg_path}  ({len(segments)} 段)")
     if segments:

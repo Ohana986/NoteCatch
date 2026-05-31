@@ -15,12 +15,17 @@
 
 import sys
 import os
+from pathlib import Path
 import subprocess
 import csv
 import math
 
 import numpy as np
 import soundfile as sf
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+sys.path.insert(0, str(SCRIPT_DIR))
+from common import get_project_root, get_output_path, CAT_AUDIO
 
 
 def synthesize_segments(csv_path: str, tone: str = "sine",
@@ -90,9 +95,11 @@ def synthesize_segments(csv_path: str, tone: str = "sine",
         audio /= peak
 
     # 保存
-    out_path = os.path.splitext(csv_path)[0] + ".wav"
-    # 替换 _segments 为 _play
-    out_path = out_path.replace("_segments", "_play")
+    # 从 CSV 文件名推导 play 文件名：替换 _segments 为 _play
+    csv_basename = os.path.basename(csv_path)
+    play_name = csv_basename.replace("_segments", "_play").replace(".csv", ".wav")
+    root = get_project_root(csv_path)
+    out_path = get_output_path(root, play_name, CAT_AUDIO)
 
     sf.write(out_path, audio, sample_rate, subtype="PCM_16")
     size_mb = os.path.getsize(out_path) / (1024 * 1024)
