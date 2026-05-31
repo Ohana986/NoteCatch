@@ -256,6 +256,24 @@ class RecordingRow(Gtk.ListBoxRow):
 
         self._playing = False
         self._paused = False
+        self._processed = False
+
+        # 检测是否已处理过（产物已存在）
+        if self._outputs_exist():
+            self._mark_processed()
+
+    def _outputs_exist(self) -> bool:
+        """检查处理产物是否已存在。"""
+        paths = resolve_paths(self.filepath)
+        return os.path.isfile(paths["vocals"]) and os.path.isfile(paths["midi"])
+
+    def _mark_processed(self):
+        """标记为已处理，按钮变为 ✓。"""
+        self._processed = True
+        self.process_btn.set_label("✓")
+        self.process_btn.set_icon_name("emblem-ok-symbolic")
+        self.process_btn.set_sensitive(False)
+        self.process_btn.set_tooltip_text("处理完成")
 
     # ── 播放逻辑 (GStreamer) ──
     def _on_play_toggle(self, btn):
@@ -444,13 +462,15 @@ class RecordingRow(Gtk.ListBoxRow):
 
     # ── 处理进度 UI ──
     def show_progress(self, text, fraction):
-        self.process_btn.set_sensitive(False)
+        if not self._processed:
+            self.process_btn.set_sensitive(False)
         self._proc_revealer.set_reveal_child(True)
         self._proc_label.set_label(text)
         self._proc_bar.set_fraction(fraction)
 
     def hide_progress(self):
-        self.process_btn.set_sensitive(True)
+        if not self._processed:
+            self.process_btn.set_sensitive(True)
         self._proc_revealer.set_reveal_child(False)
 
 
@@ -842,6 +862,9 @@ class RecorderApp(Adw.Application):
         if self.active_row is not None:
             self._toast("正在处理中，请等待完成")
             return
+        if row._processed:
+            self._toast("该条目已处理完成")
+            return
 
         self.active_row = row
         row.show_progress("准备中...", 0.0)
@@ -906,7 +929,10 @@ class RecorderApp(Adw.Application):
             GLib.idle_add(self._on_proc_done, row, f"处理出错: {e}")
 
     def _on_proc_done(self, row: RecordingRow, msg):
-        row.hide_progress()
+        if msg.startswith("✅"):
+            row._mark_processed()
+        else:
+            row.hide_progress()
         self.active_row = None
         self.statusbar.set_label(msg)
         self.statusbar.add_css_class("dim-label")
