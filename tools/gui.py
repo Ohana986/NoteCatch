@@ -603,12 +603,14 @@ class RecorderApp(Adw.Application):
         self.record_btn = Gtk.Button(label="录音")
         self.record_btn.add_css_class("suggested-action")
         self.record_btn.set_icon_name("media-record-symbolic")
+        self.record_btn.set_tooltip_text("开始录制系统音频")
         self.record_btn.connect("clicked", self.on_record)
         btn_box.append(self.record_btn)
 
         self.pause_btn = Gtk.Button(label="暂停")
         self.pause_btn.set_icon_name("media-playback-pause-symbolic")
         self.pause_btn.set_sensitive(False)
+        self.pause_btn.set_tooltip_text("暂停 / 继续录制")
         self.pause_btn.connect("clicked", self.on_pause)
         btn_box.append(self.pause_btn)
 
@@ -616,13 +618,9 @@ class RecorderApp(Adw.Application):
         self.stop_btn.add_css_class("destructive-action")
         self.stop_btn.set_icon_name("media-playback-stop-symbolic")
         self.stop_btn.set_sensitive(False)
+        self.stop_btn.set_tooltip_text("终止当前录制")
         self.stop_btn.connect("clicked", self.on_stop)
         btn_box.append(self.stop_btn)
-
-        self.import_btn = Gtk.Button(label="导入")
-        self.import_btn.set_icon_name("document-open-symbolic")
-        self.import_btn.connect("clicked", self.on_import)
-        btn_box.append(self.import_btn)
 
         self.dir_btn = Gtk.Button(label="输出路径")
         self.dir_btn.set_icon_name("folder-open-symbolic")
@@ -669,6 +667,18 @@ class RecorderApp(Adw.Application):
         self.file_list.add_css_class("boxed-list")
         self.file_list.set_selection_mode(Gtk.SelectionMode.NONE)
         main_box.append(self.file_list)
+
+        # ── 添加文件按钮 ──
+        add_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        add_box.set_halign(Gtk.Align.CENTER)
+        add_box.set_margin_top(8)
+        add_btn = Gtk.Button()
+        add_btn.set_icon_name("list-add-symbolic")
+        add_btn.add_css_class("flat")
+        add_btn.set_tooltip_text("导入音频文件")
+        add_btn.connect("clicked", self.on_import)
+        add_box.append(add_btn)
+        main_box.append(add_box)
 
         # ── 状态栏 ──
         self.statusbar = Gtk.Label(label="就绪", xalign=0)
