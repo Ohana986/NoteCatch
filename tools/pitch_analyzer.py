@@ -23,12 +23,7 @@
 
 import sys
 import os
-from pathlib import Path
 import warnings
-
-SCRIPT_DIR = Path(__file__).parent.resolve()
-sys.path.insert(0, str(SCRIPT_DIR))
-from common import get_project_root, get_output_path, CAT_DATA, CAT_PLOTS
 
 import librosa
 import numpy as np
@@ -136,10 +131,10 @@ def analyze_pitch(audio_path: str, output_dir: str = ".",
                   fmin: float = 65.4, fmax: float = 2093.0,
                   semitone_tol: float = 1.0):
     basename = os.path.splitext(os.path.basename(audio_path))[0]
-    root = get_project_root(audio_path)
-    csv_path = get_output_path(root, f"{basename}_pitch.csv", CAT_DATA)
-    seg_path = get_output_path(root, f"{basename}_segments.csv", CAT_DATA)
-    png_path = get_output_path(root, f"{basename}_pitch.png", CAT_PLOTS)
+    out_dir = os.path.dirname(audio_path)
+    csv_path = os.path.join(out_dir, f"{basename}_pitch.csv")
+    seg_path = os.path.join(out_dir, f"{basename}_segments.csv")
+    png_path = os.path.join(out_dir, f"{basename}_pitch.png")
 
     print(f"加载: {audio_path}")
     y, sr = librosa.load(audio_path, sr=None, mono=True)

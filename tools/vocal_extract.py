@@ -14,14 +14,9 @@
 
 import sys
 import os
-from pathlib import Path
 import subprocess
 import shutil
 import tempfile
-
-SCRIPT_DIR = Path(__file__).parent.resolve()
-sys.path.insert(0, str(SCRIPT_DIR))
-from common import get_project_root, get_output_path, CAT_AUDIO
 
 
 def extract_vocals(audio_path: str, out_path: str = None, out_format: str = "wav"):
@@ -32,10 +27,10 @@ def extract_vocals(audio_path: str, out_path: str = None, out_format: str = "wav
         sys.exit(1)
 
     basename = os.path.splitext(os.path.basename(audio_path))[0]
-    root = get_project_root(audio_path)
+    out_dir = os.path.dirname(audio_path)
 
     if out_path is None:
-        out_path = get_output_path(root, f"{basename}_vocals.{out_format}", CAT_AUDIO)
+        out_path = os.path.join(out_dir, f"{basename}_vocals.{out_format}")
 
     print(f"输入: {audio_path}")
     print(f"模型: htdemucs (Hybrid Transformer Demucs)")

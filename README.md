@@ -30,11 +30,13 @@ audio-analyzer/
 │   ├── gui.py                     # GNOME GUI (GTK4 + Adwaita + GStreamer)
 │   └── common.py                  # 共享工具模块
 └── recordings/                    # 录音与产物输出
-    ├── audio/                     # .wav  （原始录音、人声、纯音、混合）
-    ├── midi/                      # .mid  （Basic Pitch MIDI）
-    ├── data/                      # .csv  （音高、音段数据）
-    ├── plots/                     # .png  （音高可视化）
-    └── sheets/                    # .musicxml（五线谱）
+    ├── 系统录音_20260531_191222/   # 每条录音一个独立文件夹
+    │   ├── 系统录音_20260531_191222.wav
+    │   ├── 系统录音_20260531_191222_vocals.wav
+    │   ├── 系统录音_20260531_191222_vocals_basic_pitch.mid
+    │   └── ...
+    └── 系统录音_20260531_190539/
+        └── ...
 ```
 
 ## 快速开始
@@ -99,23 +101,23 @@ cd tools && python3 gui.py
 
 ## 输出文件命名约定
 
-输出按类型分入不同子目录（`audio/` `midi/` `data/` `plots/` `sheets/`）：
+输出按录音条目划分文件夹，每个录音的产物存放在以录音名命名的子目录中：
 
-| 子目录 | 后缀 | 内容 | 生成工具 |
-|--------|------|------|----------|
-| `audio/` | `.wav` | 原始录音 | `record-system-audio.sh` |
-| `audio/` | `_vocals.wav` | 分离后的人声 | `vocal_extract.py` |
-| `audio/` | `_vocals_play.wav` | 纯音合成 | `pitch_play.py` |
-| `audio/` | `_vocals_mixed.wav` | 原声+纯音混合 | `pipeline.py` |
-| `midi/` | `_vocals_basic_pitch.mid` | 人声 MIDI | `pitch_basic.py` |
-| `midi/` | `_basic_pitch.mid` | 全频段 MIDI | `pitch_basic.py` |
-| `data/` | `_vocals_segments.csv` | 人声音段 (Basic Pitch) | `pitch_basic.py` |
-| `data/` | `_vocals_pitch.csv` | 人声逐帧音高 (pYIN) | `pitch_analyzer.py` |
-| `data/` | `_pitch.csv` | 全频段逐帧音高 (pYIN) | `pitch_analyzer.py` |
-| `data/` | `_segments.csv` | 全频段音段 (pYIN) | `pitch_analyzer.py` |
-| `plots/` | `_vocals_pitch.png` | 人声音高可视化 | `pitch_analyzer.py` |
-| `plots/` | `_pitch.png` | 全频段音高可视化 | `pitch_analyzer.py` |
-| `sheets/` | `.musicxml` | 五线谱 | `midi_to_sheet.py` |
+| 后缀 | 内容 | 生成工具 |
+|------|------|----------|
+| `.wav` (无后缀) | 原始录音 | `record-system-audio.sh` |
+| `_vocals.wav` | 分离后的人声 | `vocal_extract.py` |
+| `_vocals_play.wav` | 纯音合成 | `pitch_play.py` |
+| `_vocals_mixed.wav` | 原声+纯音混合 | `pipeline.py` |
+| `_vocals_basic_pitch.mid` | 人声 MIDI | `pitch_basic.py` |
+| `_basic_pitch.mid` | 全频段 MIDI | `pitch_basic.py` |
+| `_vocals_segments.csv` | 人声音段 (Basic Pitch) | `pitch_basic.py` |
+| `_vocals_pitch.csv` | 人声逐帧音高 (pYIN) | `pitch_analyzer.py` |
+| `_pitch.csv` | 全频段逐帧音高 (pYIN) | `pitch_analyzer.py` |
+| `_segments.csv` | 全频段音段 (pYIN) | `pitch_analyzer.py` |
+| `_vocals_pitch.png` | 人声音高可视化 | `pitch_analyzer.py` |
+| `_pitch.png` | 全频段音高可视化 | `pitch_analyzer.py` |
+| `.musicxml` | 五线谱 | `midi_to_sheet.py` |
 
 ## 管线架构
 

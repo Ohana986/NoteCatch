@@ -24,14 +24,14 @@ import threading
 import time
 import math
 import re
+import shutil
 from pathlib import Path
 
 Gst.init(None)
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR))
-from common import get_project_root, get_output_path, resolve_paths
-from common import CAT_AUDIO, CAT_MIDI, CAT_DATA, CAT_PLOTS, CAT_SHEETS
+from common import resolve_paths
 
 
 # ──────────────────────────────────────────────
@@ -648,9 +648,11 @@ class RecorderApp(Adw.Application):
         device = f"{sink_id}.monitor"
         ts = time.strftime("%Y%m%d_%H%M%S")
         out_name = f"系统录音_{ts}.wav"
-        audio_subdir = os.path.join(str(self.output_dir), CAT_AUDIO)
-        os.makedirs(audio_subdir, exist_ok=True)
-        out_path = os.path.join(audio_subdir, out_name)
+        # 为每条录音创建独立文件夹
+        folder_name = out_name.replace(".wav", "")
+        rec_dir = os.path.join(str(self.output_dir), folder_name)
+        os.makedirs(rec_dir, exist_ok=True)
+        out_path = os.path.join(rec_dir, out_name)
 
         try:
             proc = subprocess.Popen(
@@ -757,23 +759,17 @@ class RecorderApp(Adw.Application):
     def _get_recording_wavs(self):
         exclude = ("_vocals", "_play", "_mixed", "_segments")
         wavs = []
-        # 优先搜索 audio/ 子目录，再回退根目录
-        audio_dir = self.output_dir / CAT_AUDIO
-        search_dirs = [audio_dir] if audio_dir.is_dir() else []
-        search_dirs.append(self.output_dir)
-        seen = set()
-        for sd in search_dirs:
-            if not sd.is_dir():
+        # 扫描所有子目录中的原始录音
+        for entry in os.listdir(str(self.output_dir)):
+            subdir = os.path.join(str(self.output_dir), entry)
+            if not os.path.isdir(subdir):
                 continue
-            for f in os.listdir(str(sd)):
+            for f in os.listdir(subdir):
                 if not f.endswith(".wav"):
                     continue
                 if any(x in f for x in exclude):
                     continue
-                if f in seen:
-                    continue
-                seen.add(f)
-                path = os.path.join(str(sd), f)
+                path = os.path.join(subdir, f)
                 if os.path.isfile(path) and f not in self._hidden_set:
                     wavs.append(path)
         wavs.sort(key=lambda p: os.path.getmtime(p), reverse=True)
@@ -798,13 +794,12 @@ class RecorderApp(Adw.Application):
 
     def _refresh_file_list(self):
         """重新扫描目录并重建文件列表。同时清理已不存在的隐藏条目。"""
-        # 清理隐藏列表中已删除的文件（检查所有子目录）
+        # 收集所有子目录中的文件名
         all_files = set()
-        for subdir in [CAT_AUDIO, CAT_MIDI, CAT_DATA, CAT_PLOTS, CAT_SHEETS]:
-            sd = self.output_dir / subdir
-            if sd.is_dir():
-                all_files.update(os.listdir(str(sd)))
-        all_files.update(os.listdir(str(self.output_dir)))
+        for entry in os.listdir(str(self.output_dir)):
+            subdir = os.path.join(str(self.output_dir), entry)
+            if os.path.isdir(subdir):
+                all_files.update(os.listdir(subdir))
         stale = [n for n in self._hidden_set if n not in all_files]
         if stale:
             self._hidden_set.difference_update(stale)
@@ -945,31 +940,13 @@ class RecorderApp(Adw.Application):
             row.stop_playback()
             self._playing_row = None
 
-        base = os.path.splitext(row.filepath)[0]
-        fname = os.path.splitext(os.path.basename(row.filepath))[0]
-        root = str(self.output_dir)
-        patterns = [
-            row.filepath,
-            os.path.join(root, CAT_AUDIO, f"{fname}_vocals.wav"),
-            os.path.join(root, CAT_MIDI, f"{fname}_vocals_basic_pitch.mid"),
-            os.path.join(root, CAT_DATA, f"{fname}_vocals_segments.csv"),
-            os.path.join(root, CAT_AUDIO, f"{fname}_vocals_play.wav"),
-            os.path.join(root, CAT_AUDIO, f"{fname}_vocals_mixed.wav"),
-            os.path.join(root, CAT_DATA, f"{fname}_vocals_pitch.csv"),
-            os.path.join(root, CAT_PLOTS, f"{fname}_vocals_pitch.png"),
-            os.path.join(root, CAT_DATA, f"{fname}_pitch.csv"),
-            os.path.join(root, CAT_PLOTS, f"{fname}_pitch.png"),
-            os.path.join(root, CAT_DATA, f"{fname}_segments.csv"),
-            os.path.join(root, CAT_MIDI, f"{fname}_basic_pitch.mid"),
-            os.path.join(root, CAT_MIDI, f"{fname}_full.mid"),
-            os.path.join(root, CAT_SHEETS, f"{fname}.musicxml"),
-        ]
-
-        deleted = 0
-        for p in patterns:
-            if os.path.isfile(p):
-                os.remove(p)
-                deleted += 1
+        # 删除整个录音文件夹
+        rec_dir = os.path.dirname(row.filepath)
+        try:
+            shutil.rmtree(rec_dir)
+            deleted = 1
+        except Exception:
+            deleted = 0
 
         self.file_list.remove(row)
         self.rows.remove(row)

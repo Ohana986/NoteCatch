@@ -8,7 +8,8 @@ set -eu
 # 强制英文 locale，避免 pactl 中文输出导致解析失败
 export LANG=C
 
-OUTDIR="$(dirname "$0")/../recordings/audio"
+BASENAME="系统录音_$(date +%Y%m%d_%H%M%S)"
+OUTDIR="$(dirname "$0")/../recordings/${BASENAME}"
 mkdir -p "$OUTDIR"
 
 # --- 查找当前有音频输出的 sink（取第一个 RUNNING 的）---
@@ -32,10 +33,11 @@ native_rate=$(echo "$spec" | awk '{print $3}' | sed 's/Hz//')
 [ -z "$native_rate" ] && native_rate="48000"
 
 DEVICE="${SINK}.monitor"
-OUTFILE="${OUTDIR}/系统录音_$(date +%Y%m%d_%H%M%S).wav"
+OUTFILE="${OUTDIR}/${BASENAME}.wav"
 
 echo "输出设备: ${SINK}"
 echo "原生规格: ${native_fmt} ${native_rate}Hz"
+echo "输出目录: ${OUTDIR}"
 echo "输出文件: ${OUTFILE}"
 echo "--- 开始录制（${1:+限时 ${1} 秒}${1:-按 Ctrl+C 停止}）---"
 
