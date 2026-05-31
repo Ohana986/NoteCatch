@@ -204,6 +204,15 @@ class RecordingRow(Gtk.ListBoxRow):
         delete_btn.connect("clicked", lambda b: on_delete(self))
         row.append(delete_btn)
 
+        # 打开文件夹
+        open_btn = Gtk.Button()
+        open_btn.set_icon_name("document-open-symbolic")
+        open_btn.add_css_class("flat")
+        open_btn.add_css_class("compact")
+        open_btn.set_tooltip_text("打开录音所在文件夹")
+        open_btn.connect("clicked", self._on_open_row_folder)
+        row.append(open_btn)
+
         outer.append(row)
 
         # ── 播放进度区域 ──
@@ -275,6 +284,13 @@ class RecordingRow(Gtk.ListBoxRow):
         self.process_btn.add_css_class("success")
         self.process_btn.set_sensitive(False)
         self.process_btn.set_tooltip_text("处理完成")
+
+    def _on_open_row_folder(self, btn):
+        """打开本条目录下的文件夹。"""
+        rec_dir = os.path.dirname(self.filepath)
+        subprocess.Popen(["xdg-open", rec_dir],
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
 
     # ── 播放逻辑 (GStreamer) ──
     def _on_play_toggle(self, btn):
@@ -610,15 +626,6 @@ class RecorderApp(Adw.Application):
         self.path_label.set_tooltip_text(str(self.output_dir))
         path_box.append(self.path_label)
 
-        # 打开文件夹按钮
-        open_btn = Gtk.Button()
-        open_btn.set_icon_name("document-open-symbolic")
-        open_btn.add_css_class("flat")
-        open_btn.add_css_class("compact")
-        open_btn.set_tooltip_text("在文件管理器中打开")
-        open_btn.connect("clicked", self._on_open_folder)
-        path_box.append(open_btn)
-
         main_box.append(path_box)
 
         # ── 录制提示 ──
@@ -801,12 +808,6 @@ class RecorderApp(Adw.Application):
                 self._refresh_file_list()
         except GLib.GError:
             pass
-
-    def _on_open_folder(self, btn):
-        """在系统文件管理器中打开输出目录。"""
-        subprocess.Popen(["xdg-open", str(self.output_dir)],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL)
 
     # ──────────────────────────────────────────
     # 文件列表管理
