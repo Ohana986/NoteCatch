@@ -46,9 +46,6 @@ class WaveformLogo(Gtk.DrawingArea):
         self.set_draw_func(self._draw, None)
 
     def _draw(self, area, cr, w, h, data):
-        cr.set_source_rgb(0.96, 0.96, 0.97)
-        cr.rectangle(0, 0, w, h)
-        cr.fill()
         n = 36
         gap = w / n
         bar_w = gap * 0.55
