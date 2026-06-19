@@ -1,7 +1,9 @@
 # 🎵 NoteCatch — 听见旋律，抓住音符
 
 - 注意：得益于Demucs，人声的分离效果比较好，但是人声-midi的转化还很一般
+- Note: Thanks to Demucs, the vocal separation works fairly well, but the conversion from vocals to MIDI is still mediocre at best.
 - 目前的思路是尝试使用传统的频谱分析，类似cava，加上一些算法实现，但是可能要鸽一段时间
+- My current plan is to try using traditional spectrum analysis, similar to what Cava does, combined with some custom algorithmic implementations. However, this might be put on hold for a while.
 
 > 播放任意音频 → 自动分离人声 → 识别音高 → 输出 MIDI / 五线谱 / 纯音合成
 
